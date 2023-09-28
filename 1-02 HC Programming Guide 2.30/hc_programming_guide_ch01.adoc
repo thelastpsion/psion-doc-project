@@ -1,0 +1,795 @@
+== INTRODUCTION TO THE HC
+
+=== The HC concept
+
+Combining modular hardware design and the most modern software techniques, the Psion HC range of computers represents a new approach to computing in the field.
+HC computers can extend existing computer networks away from the office, right up to the "front line" -- whether that's in a warehouse, on a sales call, on a maintenance visit, or wherever.
+Rugged and powerful, HC computers are the mobile elements of a computer system, ensuring that information held "at base" in the office is timely and accurate by putting the base directly in touch with the point of action.
+
+The HC has been designed to be integrated into any computer system and to meet any application requirement: assisting with the making of deliveries, taking of orders, collecting or distributing information, servicing equipment, and so on.
+
+Every element of the hardware is configurable, from the plug-in megabyte-sized Solid State Disks, to the internal expansion slots for peripheral devices such as bar code scanners, modems, and magnetic card readers.
+
+Equally important is the multi-tasking operating system with full graphics and windowing capability.
+Applications can make productive use of the various fonts and emphases available, and can even display and manipulate diagrams, maps, and pictures.
+The result: software applications that are highly informative and intuitive to use, and which consequently improve operator acceptance and efficiency.
+
+The multi-tasking facilities -- unique to the HC range among handheld computers -- significantly shorten software development times and greatly simplify otherwise complex issues ranging from the simultaneous monitoring of several peripherals -- a bar code scanner and a modem, for example -- through to sophisticated process control applications.
+
+==== Switching on and off
+
+The HC can be switched on or off by means of the kbd:[ON/OFF] key near the top left corner of its front face.
+Typically, this key is salmon-coloured -- though colour configuration is one of many customisation measures possible for the HC.
+
+There is no need to "exit" programs before switching the HC off.
+When the HC is next switched on, all current programs continue from their previous state.
+The contents of the internal RAM memory are preserved throughout the period of being switched off, without any significant current being drawn in the meantime.
+
+==== Switching on for the first time
+
+The first time an HC is switched on or immediately following a reset, it will probably display the _"Insert Pack and press enter"_ message.
+
+This indicates that the HC is searching for a configuration file called `autoexec.btf`.
+
+To by-pass this message and hence accept the default configuration, press kbd:[Psion+Esc] (the PSION key has the familiar "cup and saucer" logo: it is usually located near the bottom left of the keyboard).
+For keyboards that do not have an ESC key, kbd:[Shift+C] should be typed instead.
+The HC in due course presents a $ prompt to indicate that its Command Shell is ready to receive commands.
+
+=== The basic hardware
+
+All aspects of the hardware of the HC have been designed with the following goals in mind:
+
+* portability
+* ruggedness
+* data security
+* ease of use
+* adaptability
+* long battery life.
+
+#### Processor
+
+The HC has an industry standard 80C86-compatible 16-bit processor, the NEC V30H, that runs at a clock rate of 3.84MHz.
+
+The HC also contains a number of proprietary-designed custom-built chips called ASICs, which are responsible for many of its more exclusive features.
+See the _Hardware Reference_ manual for more details.
+
+#### Internal memory
+
+The amount of internal RAM memory on an HC varies from model to model.
+The basic model, the HC100, has 128k of RAM; the HC110 has 256k, and the HC120 has 512k.
+
+All models have 256k internal Flash ROM.
+Because the ROM is Flash rather than "OTP" (one-time programmable) or "masked", it is possible for its contents to be altered by special techniques, facilitating additional ROM-based customisation -- even down to the level of individual HCs.
+
+==== Solid state disks (SSDs)
+
+The standard HC has two solid state disk drives, which are the equivalent of disk drives on a PC.
+To access them, open the rear cover by pressing the catch on the left side of the HC (if the catch is locked, turn it through 180°.)
+SSDs can be inserted into the disk drives in the top third and the bottom third of the area enclosed by the cover.
+
+SSDs should be inserted with their upper faces (containing large writing) nearest to the rear cover of the HC.
+If you try to insert them upside down, by accident, you will find they don't fit properly into their slots -- so there is no risk of any untoward damage.
+
+The SSD drive near the top of the HC is drive A:, and that near the bottom is drive B:.
+
+SSDs give open-ended capacity for data storage in a highly secure and compact form.
+SSDs can also be read by other computers in the SIBO range, as well as by PCs equipped with an SSD drive.
+
+The speed of data transfer to and from SSDs is enormously faster than with floppy disks, and compares favourably, at 320 kBytes/sec, with even the fastest of hard disks.
+
+There are no moving parts in any SSD, nor in any SSD drive.
+This is one reason why, notwithstanding the high performance statistics for SSD data transfer, HC batteries last for as long as they do.
+
+Note that you should never open the rear cover of the HC while any SSD is being accessed by the HC.
+
+Opening the rear cover switches the machine off immediately, and data loss could occur.
+In any case of doubt, switch the HC off manually (use the ON/OFF key) before opening the rear cover: this method of powering down the HC is guaranteed not to lose any data between the HC and its SSDs.
+
+==== Types of SSD
+
+There are two types of SSD: _Flash_ and _Ram_.
+Either type of SSD can be used in either HC drive.
+
+RAM SSDs can be overwritten selectively making them ideal for storing frequently altered information.
+
+RAM SSDs when not plugged into an HC require a backup battery to preserve their data.
+The battery is a standard miniature lithium cell, with a guaranteed in-use life of one year.
+It is easily replaced by the user.
+
+A RAM SSD when plugged into an HC will preserve its data _indefinitely_; the one year battery lifetime refers only to periods in which the SSD is not plugged into an HC -- only then does a RAM SSD draw current from its own battery.
+
+Flash SSDs are a highly secure medium requiring no battery to maintain data integrity.
+They are ideal for storing data not intended for frequent editing or revision.
+
+When files on a Flash SSD are deleted or modified the original data is simply marked as "inaccessible".
+The result is rather like crossing out entries in a filofax: the entries still occupy physical space.
+In due course, the disk may become full up with out-of-date entries.
+However a Flash SSD can easily be reset to its original pristine state by "formatting" it.
+If a Flash SSD is full because unwanted "erased" files are still occupying space, but the disk also contains some data still wanted, copy all files to another disk (using eg the `copy *.*` command of the Command Shell).
+The erased files are ignored by any such `copy` command, so only the data wanted is copied across.
+The original disk can then be cleared, by formatting it, before relevant files are copied back on to it.
+
+At the time of writing, Flash SSDs are available up to 2 Mbyte in size and Ram SSDs up to 1 Mbyte.
+By the time you read this, Flash SSDs up to 8 Mbyte in size may be available.
+
+Each SSD has a switch so that the data on it can be write-protected.
+While an SSD is write-protected:
+
+* nothing it contains can be altered or deleted
+* the data held on it can only be read.
+
+The write-protection can be removed by setting the switch back to the 'Write' position.
+
+==== Expansion modules
+
+There is an expansion port at either end of the HC.
+These can hold a wide variety of interface devices.
+Possibilities include:
+
+* RS232/parallel printer port
+* barcode reader (complete with wand or CCD/Laser scanner)
+* magnetic card reader ("MCR")
+* modem
+* "combination" devices such as RS232/MCR/scanner.
+
+The two ports are identical, except for their names: "Port A" (at the top end of the HC) and "Port B".
+
+To remove a module from either expansion port, release the rear cover, in the same way as for the SSDs.
+Slide the release button next to the module to the UNLOCK position and pull the module out.
+To replace, push the module right in and lock the module into position by pushing the catch into the locked position.
+The rear cover cannot be closed unless this catch has been set to LOCK.
+
+It is even possible for the contents of an expansion module to be exchanged "in the field".
+There is no need to reset the HC before doing this.
+
+==== The Fast Serial port and the Cradle
+
+The Psion Cradle has been designed to satisfy requirements for:
+* secure mounting for the HC
+* "hands-free" operation
+* battery recharge
+* high speed data transfer with a PC.
+
+The Cradle incorporates a security lock to ensure that the HC is held reliably.
+A trigger loaded spring release and hand recess guarantees easy insertion and removal.
+
+There is an additional i/o port, the Fast Serial port, on the right side of the machine, for data exchange and battery charging.
+It is designed to be connected directly to a Cradle.
+The high reliability contacts automatically engage when the HC is placed in the Cradle -- no user-made connections are required.
+
+Data is exchanged via the Fast Serial port at up to 1.5Mbits/sec.
+
+The Cradle contains an expansion slot provided to accommodate a high-speed connection to a PC.
+This slot can be used, alternatively, for RS232, MCR, or modem modules (among others).
+See the chapter _The HC in the Cradle_ for more details.
+
+==== Power supply
+
+The HC can be powered using rechargeable nickel-cadmium batteries or an optional mains adaptor.
+
+The HC will not switch on if there is no power source, if the batteries are too low, or if the rear door is open.
+Power is needed to operate the HC and to maintain the data stored in internal memory.
+Data stored on SSDs, however, doesn't rely on the main power source.
+
+On the right side of the machine, under the rubber plug, is a socket labelled POWER.
+Plug the mains adaptor into this socket.
+The red power indicator light will come on.
+This light indicates that the HC is being powered by an external source, such as the mains adaptor -- even if the HC itself is not switched on.
+
+The HC is also supplied with a small round lithium battery.
+This is the backup battery.
+It is essential because it keeps the internal memory secure if the main batteries are being changed.
+It should be fitted before the main batteries.
+However, the HC cannot be run using only the backup battery.
+
+To see where to fit the backup battery, remove the expansion module at the base of the HC.
+The positive side of the battery should face upwards (towards the rear of the HC).
+The backup battery should last for approximately one year, provided the HC doesn't spend long periods with no other power supply.
+It is recommended that a new backup battery is fitted yearly (if the HC is left
+powered only by the backup battery, the battery will last for approximately one month).
+
+The main battery cartridge is stored in the back of the HC, between the two SSD drives under the rear cover.
+It contains the rechargeable batteries.
+_Do not attempt to disassemble the battery cartridge._
+
+To remove the cartridge, switch the machine off and release the back cover as for SSDs, then push and lift the cartridge.
+To fit the battery cartridge back into the HC, slide it into place and close the rear cover; the machine can now be switched on.
+
+The nickel-cadmium batteries can be recharged in several ways:
+
+* leave the sealed cartridge in the HC while powered from the mains -- the batteries will be trickle charged
+* remove the sealed cartridge from the HC and plug a mains adaptor into it to recharge the batteries directly from the mains
+* trickle recharge by a standard Cradle
+* fast recharge by a Cradle supporting this facility.
+
+The HC can be configured so that, when either battery is low, a warning message will appear.
+Independently of this, there are a variety of software methods to monitor the voltages of the batteries.
+
+When the main battery is low, the HC may have enough power to display the screen and accept input from the keyboard, but not enough to write to Flash disk or access expansion devices.
+The HC will turn off if an operation is attempted for which it does not have enough power.
+New batteries should be fitted (or the existing batteries recharged) before the operation is tried again.
+
+In order to save power, the HC will by default switch itself off automatically, if left alone for 5 minutes.
+The "auto-switch-off" time can be changed to another value, if desired, or the HC set so that it does not auto-switch-off at all.
+
+==== Caution regarding lithium batteries
+
+Note that there is a risk of explosion if lithium batteries are fitted incorrectly.
+Be sure that the backup battery is fitted so that, if the bottom expansion port is removed, the face of the battery containing the plus symbol is the (partly) visible one.
+(This is the flatter of the two faces.)
+
+Lithium batteries should be replaced only with the same or equivalent type, as recommended by Psion.
+Used lithium batteries should be disposed of according to the manufacturer's instructions.
+
+==== Screen
+
+The normal HC screen is a retardation film LCD 160 pixels wide by 80 pixels deep.
+In a standard font, this allows for the display of 9 lines each with around 30 characters.
+If fewer characters are required to be displayed, a larger font can be used, to achieve a more striking screen image.
+
+Changing the font is only one example of the graphics support supplied by the resident software.
+
+By default, the screen is illuminated by reflected light, using (as throughout the HC) state-of-the-art technology.
+In case additional lighting is required, a variant is available with a factory-fitted backlight.
+This backlight can be switched on or off whenever the user requires (bearing in mind that there is an inevitable additional drain on the batteries whenever the backlight is used).
+Alternatively, the HC can be configured to switch off the backlight automatically once a given time period has elapsed.
+
+==== Keyboard
+
+The keyboard features positive travel dished keys with durable legends.
+
+Various keyboard layouts are available, depending on how the HC is to be used.
+For example,
+
+* a full alphanumeric keyboard (53 standard-sized keys)
+* a more limited, number-oriented keyboard (31 larger keys)
+* the alphanumeric keyboard can be augmented with special characters used in Scandinavian countries -- these extra characters being accessed via the kbd:[Psion] modifier key
+* alternatively, the alphanumeric keyboard can be augmented with special characters used in mainland European countries.
+
+The following special keys may also be present:
+
+[cols="1,4"]
+|===
+|kbd:[ON/OFF]
+|switches the HC on and off
+
+|kbd:[BACKLIGHT]
+|switches the backlight on and off (if one is present)
+
+|kbd:[LCD]
+|controls the contrast of the LCD display
+
+|kbd:[MENU]
+|under application control
+
+|kbd:[TASK]
+|accessed via the kbd:[SHIFT] key: allows for switching between tasks
+
+|kbd:[INFO]
+|accessed via the kbd:[SHIFT] key: under application control (by default, the voltage levels of the main and backup batteries are displayed)
+
+|kbd:[F1] through kbd:[F4]
+|extra keys under application control
+
+|kbd:[LOCK]
+|forces the keyboard into upper case
+
+|kbd:[DEL]
+|used to edit typing
+
+|kbd:[ESC] or kbd:[C] (CLEAR)
+|used to clear a line of input or cancel an entry
+
+|kbd:[ENTER]
+|terminates a line of input.
+
+|kbd:[PSION]
+|an extra modifier key (analogous to kbd:[Alt] on a PC), recognisable by its familiar
+"cup and saucer" Psion logo.
+|===
+
+=== The basic software
+
+The software running on an HC at any one time is a mixture of
+
+* ROM resident core software (the "operating system")
+* ROM resident utilities, such as the MS-DOS like Command Shell and the Link communications software
+* application software, from an SSD or internal memory
+* library software, again from an SSD or internal memory.
+
+Library software is software that can be re-used by more than one application.
+It may be written by Psion, by the application writer, or by a third party.
+
+The effectiveness of library software and application software can be increased considerably by informed use of the ROM resident software -- this software sets the HC apart from its competitors just as much as its unique hardware does.
+
+See the following chapter, _Writing Software for the HC_, for some initial guide-lines on how to write applications or library code for the HC.
+
+==== Versions of the HC software
+
+Whilst the bulk of the material in this manual holds true for HCs with ROM version numbers less than 1.50, parts of the manual presuppose that the ROM software running on the HC has version number at least 1.50.
+
+To see which version of ROM software is contained in any HC, type `ver` at the `$` prompt in the Command Shell.
+(Alternatively, the version number is displayed following any reset.)
+
+Machines with ROM version numbers less than 1.50 can easily be upgraded, using the _Repro_ procedure discussed later in this chapter, in conjunction with a suitable Master SSD.
+
+==== The terms Epoc and Plib explained
+
+What counts as the operating system of the HC and what counts as an application depends on your point of view.
+The services in the HC ROM software that applications programmers can call upon actually consist of many layers -- as the following few sections make clear.
+
+The kernel of the operating system of the HC is known as Epoc.
+See the _Introduction_ chapter of the _PLIB Reference_ manual for a detailed list of the essential characteristics of Epoc.
+
+Epoc contains code to implement the Plib function library -- Psion's version of the standard C programming library, as modified and extended for use by HC programs.
+
+The core ROM of the HC contains considerably more than just the Plib library: for example the _Window Server_ which is responsible for the screen and the keyboard is a completely separate process the code for which is resident in the ROM.
+
+Hence in response to the `ver` command at the `$` prompt of the Command Shell, versions numbers will be given for the HC ROM version number, the Epoc operating system and the Command Shell.
+
+Initially applications programmers will have little need to distinguish between the various components of the HC operating system.
+However distinctions do exist and it is necessary to understand them in order to
+write more advanced applications.
+
+==== Graphics window server
+
+The Window Server is ultimately responsible for all graphics output on the HC and is also responsible for channelling all keyboard input to the appropriate application(s).
+
+The Window Server includes support for basic text printing functions of the `puts` and `gets` variety -- as used in the Command Shell.
+However, it is expected that most applications will go beyond this level and hence take advantage of at least some of the graphics enhancements supported by the Window Server:
+
+* text display in a variety of fonts and font styles (eg bold, italic), including fonts that are proportional as well as some that are monospaced
+* display of characters (or other small icons) in a _custom-designed_ application-specific font
+* line, box, and poly-line drawing
+* area clearing, filling, inverting, and greying
+* flashing cursors and other animated displays, including clocks that are automatically updated
+* general bitmap and icon manipulation, eg involving maps, markers, and diagrams
+* alert dialogs, information status messages, and flashing "busy" indicators.
+
+It is possible to achieve screen displays which update themselves without any annoying flicker, which scroll smoothly, and which redraw quickly whenever required -- in marked contrast to some other graphics systems.
+
+See the _Window Server Reference_ manual for a complete description of the Window Server.
+
+==== Multi-tasking kernel
+
+From the beginning Epoc was designed as a pre-emptive multi-tasking operating system.
+It is multi-tasking in that multiple processes can run concurrently and exchange data dynamically.
+It is pre-emptive in that a lower priority process is always interrupted when a higher priority process is ready to run.
+Routine processing can always be _sent into background_ if the user has something more urgent to attend to.
+
+Often an application is best written as two or more components each of which implements part of the applications overall functionality.
+Under Epoc these processes can run concurrently and exchange data as and when required.
+While one process is sitting idle waiting for an event another process is being run.
+When the first process receives the event it too starts running immediately with no idle waiting for the second process to complete.
+
+Often the user will require two or more applications to be running at the same time.
+Under Epoc the user can ask one application to print a large text file and then use another application for editing a second text file.
+The only restriction is that no more than one application may access a given hardware device at a given time.
+In the example the first application is accessing the serial (or parallel) port.
+The second is accessing the screen and the keyboard.
+Thus there is no conflict.
+
+To switch between applications provided with a user interface the user can press the kbd:[TASK] key.
+This simply brings the application into the foreground.
+Applications software may provide additional mechanisms for bringing applications into the foreground.
+Writing various programs separately and then giving the user the opportunity to combine them as required -- depending on circumstance -- naturally adds to the attractiveness of a suite of software.
+For example the _shell_ component of the operating system -- the Command Shell which is supplied with the HC -- can easily be replaced with a third party shell as long as it is given the appropriate name (`sys$shll.img`) and fulfils a
+few basic functions.
+The Window Server may also be replaced although this would be a very complex task and is thus not recommended.
+Less radically the applications programmer should consider supplying processes that run alongside the in-built ones and which add to the overall functionality of the HC.
+
+==== Support for asynchronous i/o
+
+A central concept that underlies user friendly interfaces is the idea that the computer should not be held up indefinitely, waiting for an event to complete.
+For example, the user should always be able to cancel an aberrant data transfer, or a mistaken print request, without having to resort to resetting the computer.
+
+Part of the support Epoc provides for this is its multi-tasking capabilities (see above).
+Another part is its large range of _asynchronous_ i/o services.
+Rather than just having a request, for example, to print a line (and to wait until the line has indeed been printed), there is a request to print a line _and to notify the
+program when the line has been printed_ leaving the program free to process other data input in the meanwhile.
+
+Another reason why asynchronous services are of fundamental importance is that programs often cannot tell which of two events will be the next one to occur -- where the events include not just input from the user, but also a variety of communications data and other peripheral input.
+Again, a subprocess may report that it has finished some lengthy activity, such as scanning a large database; a supervising program would have to be ready to respond to this notification, as well as being ready for any other kind of data input.
+Programs ought to be structured to cope with any of these events being the next one to occur.
+
+Traditionally, function libraries offer poor support for asynchronous services.
+Not so the Plib function library that is built into the HC ROM.
+
+==== Database support functions
+
+The Plib file i/o functions can be used for any variety of data formats on file, and HC programmers can choose whatever they feel most comfortable with.
+
+However, much can be said in favour of the Dbf file format:
+
+* ROM-resident code provides a rich set of services to simplify access to files of this format.
+* it is designed with Flash-friendliness as a high priority, with incremental file modification as individual records are updated.
+* services such as random and sequential access are both highly optimised.
+* other services such as merging and compressing databases are easy to use.
+
+For larger or more complicated databases, programmers may consider using the _ISAM (Indexed Sequential Access Method)_ library that is separately available to support program development.
+The ISAM routines mesh closely with the Dbf services in Plib.
+See the _ISAM Reference_ manual for more details.
+
+==== Support for remote file access
+
+In contrast to just supporting remote file _transfer_ -- a notion familiar to most users of computers -- the HC operating system supports the more radical and far-reaching notion of remote file _access_.
+In many situations, remote file access is altogether the more convenient way for software on one computer to interact with some data stored on another computer.
+
+To clarify the distinction between remote file transfer and remote file access, consider some software on an HC, that from time to time accesses a database stored on a central PC.
+One method to achieve this would involve the following steps:
+
+* transfer a copy of the database from the PC to the HC
+* have the HC software operate on the local copy of the database
+* finally transfer the copy of the database back from the HC to the PC.
+
+Two separate pieces of software are involved in this:
+
+* the database application running on the HC
+* some communications software, implementing the file transfer.
+
+However, with remote file _access_, the database software on the HC directly accesses the database file on the remote computer.
+There is no need for some independent software to copy the _whole_ database from PC to HC and then, later, back again.
+Instead, the operating system of the HC automatically transfers only that small part of the data in the database that the software on the HC needs to access.
+
+At one level, the way this works is by an extension of the concept of a filename.
+Traditionally, the _full_ specification of the location of a file on a computer would have been something like
+
+ a:\project\library\backup.c
+
+However, in the view of the HC operating system, this name is actually incomplete (though it suffices for many purposes); strictly, speaking, the full specification of the location of a file on an HC would be something like
+
+ loc::a:\project\library\backup.c
+
+with the leading `loc::` indicating that the file is on the local computer.
+To gain direct access over a file on a remote PC, a filename such as
+
+ rem::c:\hc\backup.c
+
+should be specified -- with the leading `rem::` indicating that the file is on the remote computer.
+Given that the computers are connected appropriately, observing the correct naming conventions is all that an application needs to do to gain direct access to files on the remote computer.
+
+In some ways, the remote file access facility of the HC operating system can be compared to the way that networking software provides additional drives on desk top computers.
+Thus a PC which ordinarily has drives A: and C: may gain drives N: and U: when connected to a network -- these additional drives allowing access to files stored on the network server or on other computers linked together by the network.
+
+But in another way, the remote file access in PLIB is considerably more general; this is why the additional drives appear _as another filing system_.
+The point is that access is permitted not only to a PC connected to the HC, but also to one of many other types of computers, such as Apple Macs.
+
+For example, to specify a file on an Apple Mac connected to an HC, the following filename might be given:
+
+ rem::hd40:mike's folder:november:results
+
+where it should be noted that the form of the filename is quite different from that allowed by MS-DOS (eg containing spaces and having more than eight letters in a directory name).
+
+For more details, see the section below on _Connecting to other computers_.
+
+==== Other ROM-based library services
+
+In order to fully appreciate the Plib library it is necessary to read the documentation in the Plib Reference manual.
+
+Features worth noting include:
+* a full range of mathematical and scientific functions.
+* file management and filename manipulation functions.
+* support for reading and writing environment variables.
+* support for dynamic memory allocation inside and outside the native data segment of an application.
+* support for absolute and relative timers.
+An application could for example switch on an HC and perform a preassigned task at a preset time.
+* control over the HC system set-up.
+Thus an application could for example set the auto-switch-off time, change the language used, and adjust the LCD contrast and backlight setting.
+* sophisticated support for error handling.
+* special support for advanced object oriented programming methods.
+
+==== Other ROM components
+
+Additional files in the ROM include
+
+[cols="1,4"]
+|===
+|`custom$.dat`
+|a specially customisable file that can be written to once and once only
+
+|`sys$shll.img`
+|the Command Shell, as described in detail in a separate chapter
+
+|`sys$ntfy.img`
+|the basic Notifier process, used by default to report error conditions (such as missing SSDs)
+
+|`sys$ctry.cfo`
+|the location of all the language-dependent text strings used by the operating system, as well as keyboard layout information
+
+|`opl.dyl`
+|allows programs written in OPL to be run (see the _OPL Development Kit_ for more information)
+
+|`olib.dyl`
+|provides additional services that object oriented programmers can access (see the _OLIB Reference_ manual)
+
+|`batchk.img`
+|displays information about battery voltage levels
+
+|`pprint.img`
+|prints a specified file via a nominated peripheral (likely to be omitted from future versions of the ROM)
+
+|`ttest.img`
+|tests the status of the serial port (likely to be omitted from future versions of the ROM).
+|===
+
+Additionally, the ROM contains a variety of programs and device drivers to facilitate communication with other computers -- be they PCs, Macs, computers in the SIBO range, or whatever.
+Chief amongst these is the Link program, described in more detail later in this chapter.
+
+Finally, the ROM also contains a number of built-in fonts (`*.fon` files).
+
+NOTE: To obtain a listing of all the files in the ROM, type `dir /p rom::` at the `$` prompt of the Command Shell.
+Note that no file corresponding to Epoc itself appears in this listing.
+Epoc is the kernel of the operating system, and not a file in `ROM::`.
+
+=== Customising an HC
+
+This section describes some of the many ways an HC can be customised, to make it ideally suited to some particular set of needs.
+
+==== Hardware customisation
+
+The HC can be customised to suit customer requirements.
+
+Simple examples of hardware customisation include changing the labels and branding, changing the colour scheme and replacing the keyboard legends.
+
+More complex examples of hardware customisation include changes in the keyboard layout, changes in the size of the LCD, and changes in the assembly of the LCD allowing operation in more extreme ranges of temperature (the cold of the arctic for example).
+
+Further details of hardware customisation are beyond the scope of this manual, which focuses mainly on software customisation.
+
+==== Replacing the built-in Shell
+
+The Window Server will when the HC is first switched on (or following a reset) search for the shell program stored in the file `sys$shll.img`.
+The search is carried out as follows:
+
+* first in the root of a:
+* then in the root of b:
+* then in the root of m:
+* finally in the ROM.
+
+On finding the shell program the Window Server will start it running.
+Unless specially customised to the contrary, the Window Server also looks for a program of this name, along the same path, whenever the shell terminates (either normally or abnormally) -- so as never to leave the HC without a shell running on it.
+
+The importance of this is that the shell program in the ROM can be over-ridden by one on an SSD.
+HCs _in the field_ will typically be running a shell from an SSD, rather than that from the ROM.
+
+The ROM shell is more suited to _development_ work, supporting a rich variety of file management, task management, system configuration, and batch file processing commands.
+However, this functionality brings its own cost in RAM consumption that may well be undesirable for HCs running application software.
+
+By and large, applications writers will most of the time use an alternative shell, switching back to the built-in Command Shell only when the need arises during program development.
+
+Switching from the Command Shell to a custom shell on an SSD involves
+
+* inserting the SSD containing the custom shell
+* tasking to the Command Shell
+* typing `term sys$shll` (term is short for `terminate`).
+
+Switching back to the Command Shell from a custom shell involves
+
+* removing the SSD on which the custom shell resides
+* terminating the shell, either by a command supported by the custom shell, or by resetting the HC
+* the Window Server, in restarting the shell, will no longer find the custom shell, and hence will start the Command Shell from the ROM instead.
+
+One reason why, even during development work, the Command Shell may not be required, is that most of the basic functionality the Command Shell provides can be duplicated by commands transmitted down a serial connection from the PC to the HC.
+These commands can be invoked either using the SIBO Debugger, or using MCLink.
+
+A program developed as an alternative shell would typically have another name during development, such as `hcshell.img`.
+It would be renamed to `sys$shll.img` only at the last minute.
+Otherwise, other SIBO programs, such as the SIBO Debugger, might fail to work, on account of finding this alternative shell and attempting to run it instead of the appropriate shell that is built into their own ROM.
+
+==== Resetting the HC
+
+It should rarely be necessary to reset the HC.
+Even if, during development, an application contains some dreadful bug, this is most unlikely to cause the entire HC system to hang.
+
+For example, any illegal attempt by an application to write to data outside its own data segment will lead to the operating system terminating the application forthwith, in a so-called _panic_.
+Likewise should an application leave interrupts disabled for too long.
+
+However, the worst may come to the worst and a reset may prove necessary.
+Alternatively, it may be required to reset the HC, just in order to terminate one shell process and to cause a new one (say that in the ROM) to be started instead.
+
+Before resetting, it is wise to first terminate all applications and save any important data to an SSD or a PC.
+
+To carry out a soft reset of an HC, insert the end of an opened paper-clip into the reset hole (located just to the right of the microphone).
+This will re-boot the HC forcing the abandonment of all programs running at the time and the consequent loss of the associated data.
+The files in the internal memory (m:) will not be lost.
+
+To carry out a hard reset hold the kbd:[ON/OFF] key down while pressing the paper clip into the reset hole.
+This will erase all internal memory including environment variables.
+
+==== Reproing the HC
+
+For some applications, an alternative mix of files on the ROM may be required for special customisation purposes:
+
+* programs run out of ROM have less of a RAM overhead than those run from an SSD.
+* programs in the ROM are physically more secure than those on an SSD, in the sense that an SSD can be removed by a user but the ROM cannot.
+* programs in the ROM may be able to take advantage of special software features inaccessible to programs on an SSD -- for example, the fact that ROM code and data segments always remain at a fixed address.
+* programs in the ROM are easier to copy protect.
+
+All the different files comprising an HC ROM need to be assembled on a PC, and then combined into a special _master_ file, with extension `.mas`.
+This process is described in the chapter _Customising the HC ROM_, later in this manual.
+
+The process of transferring a `.mas` file into the ROM of an HC is called _reprogramming_, or _reproing_ for short.
+Reproing can be used, not only to produce a specially customised version of the ROM software, but also to upgrade an earlier ROM to a more recent one (say to ROM version 1.50).
+
+Reproing requires a _master SSD_, which contains both the `.mas` file and the repro software itself.
+Note that, counter-intuitively, reproing will not work if the master SSD is write-protected.
+
+During reproing, the HC should be powered from the mains.
+As a precaution, it is wise also to have a
+charged battery in the HC: if the power fails during reprogramming, the HC will need to be sent back to Psion before it works again.
+
+The master SSD should be placed in either of the SSD drives and the rear cover of the HC closed.
+Type `repro` followed by kbd:[ENTER] at the `$` prompt of the Command Shell.
+Once the HC has displayed the new master details, press kbd:[ENTER] again to confirm reprogramming.
+
+On HCs with the 31 key numeric keyboard, it is impossible to type kbd:[repro], so type the following instead:
+
+ YES 0 NO 0 ENTER
+
+The message `Y0N0` will appear on the screen, and then _repro_ will run as normal.
+
+During reproing, the HC displays large characters on the top line of the screen, starting with `A000`.
+In all, four rows of figures will eventually be displayed.
+On completion, the HC will emit beeps, and an automatic reset should occur.
+Occasionally, the automatic reset may fail to occur, in which case a hard reset should be executed (as described above).
+
+As usual following a reset, the automatic search that takes place in these circumstances for a file `autoexec.btf` can be circumvented by pressing kbd:[Ppsion+Esc] (or, on keyboards with no kbd:[Esc] key, kbd:[Shift+C]).
+
+Once reprogramming has completed, the new ROM version number can be determined using the command `ver` in the Command Shell.
+Note that (in contrast with the case of reproing the laptop MC computers) no additional hardware repro enabler is required in order to repro an HC.
+
+==== Master SSDs and mastcpy
+
+The master SSDs used during reprogramming cannot be duplicated using ordinary software (such as the copy command in the Command Shell).
+More precisely, only _part_ of the contents of a master SSD can be copied in this way.
+
+However, a special tool is available, called `mastcpy`, which _can_ make a copy of a master SSD.
+
+The `mastcpy` program runs on a PC with an external SSD drive.
+
+==== Once-off ROM customisation using Romwrite
+
+As an alternative to reproing an HC with a specially customised ROM, it is possible to customise it by overwriting, in a special way, the contents of the file `custom$.dat` that is in the ROM.
+Typical uses of this mechanism include
+
+* adding special information such as serial numbers or details of the owner.
+* loading an alternative set of _language text_, containing versions of such operating system messages as "Low main battery" and "No system memory" in a foreign language.
+
+In order to write to this file, the special tool `romwrite.img` (available as part of the SDK) has to be used.
+
+Note that `romwrite` can only be used with HC ROMs with version number 1.50 and above.
+Mains must be present for `romwrite` to operate.
+Romwrite copies the contents of a file supplied by the user, with the name `custom$.ref`, into the ROM file `custom$.dat`.
+The file `custom$.def` must be placed in the same directory as `romwrite.img`.
+A maximum size of 4608 bytes is allowed for `custom$.ref`.
+If this file is larger than 4608 bytes, only the first 4608 bytes will
+be copied into ROM, and no error will be reported.
+Romwrite appends two further bytes to the end of the copied information.
+These are required checksum information.
+
+To invoke romwrite:
+
+* copy `romwrite.img` and a suitable file `custom$.ref` to an SSD.
+* place the SSD in the HC.
+* connect a mains adaptor to the HC.
+* type `romwrite` at the `$` prompt of the Command Shell.
+
+An error message will be given if the file `custom$.dat` in the ROM has already been written to, or if there were any problems in writing to the internal ROM.
+
+WARNING: if a write error occurs during `romwrite`, the HC must be reproed from a master SSD before being used any further.
+_Do *not* reset the HC._
+
+Once the contents of `custom$.dat` have been overwritten using _romwrite_, they cannot be overwritten again until the ROM has been reproed.
+
+Reproing entirely loses the contents of this customised file.
+However, the contents are unaffected by any reset, _even a hard reset_.
+
+==== Customisation for copy-protection
+
+One additional use of the file `custom$.dat` would be to frustrate illicit copying of software (see also the chapter _Copy-Protecting Software_ in the _General Programming Manual_ for discussion of alternative methods with the same end).
+
+Briefly, when an application is started, it could read the contents of `custom$.dat`, looking for a pre-defined byte-stream signature.
+If this signature is not present, the application would refuse to run.
+
+The signature would have to be written beforehand, into custom$.dat, by means of a special installation program.
+Possibly, the software company producing the application would make a special charge to administer the installation program (whose details would need to be kept secret).
+
+=== Connecting to other computers
+
+Connections between an HC and another computer, such as a PC or Mac, can be divided into two sorts:
+
+* *high speed connections*, which require the HC to be located in a Cradle and which generally also require the PC to be fitted with an ASIC2 expansion card
+* *standard connections*, which simply require a standard serial cable between the HC and the other computer (no expansion card is required in this case).
+
+High speed connections are discussed more fully in the chapter _The HC in the Cradle_.
+The remainder of this section focuses primarily on standard connections.
+See also the chapter _Mclink, Mcprint, and Slink_ in the _Additional System Information_ manual.
+
+==== Basics of serial connections to an HC
+
+Any connection between two computers involves a _hardware connection_ and a _software connection_.
+
+When an HC is connected to another computer, the software connection will generally be via Epoc Link software.
+A version of this software has to be running on each of the two computers.
+
+The Link software can be started on the HC simply by typing `link` into the Command Shell.
+One way to start it on a PC is to invoke the executable `mclink.exe` (similar programs also exist for other types of computer, such as Apple Macs).
+
+The hardware connection between a PC and an HC, when Link software is running, can involve either a custom RS232 cable plugged into the PC at one end and the HC at the other, or a High Speed Serial connection via an HC Cradle.
+
+==== RS232 connections
+
+Modern PCs have 9-pin sockets on serial ports; older ones have 25-pin sockets.
+If you only have one serial port on your PC, it is called COM1, although it is common for PCs to have a second serial port called COM2 (COM3 and even COM4 are also possible, but the Link software does not support these).
+
+Connect the appropriate socket at the PC end of your cable to COM1 if is available -- otherwise, use COM2.
+Link software on the PC sees COM1 as `TTY:A` and COM2 as `TTY:B`.
+Alternatively, these can also be referenced simply as "p1" and "p2" (for _ports_ 1 and 2).
+
+To specify that MCLink uses port 1, type
+
+ mclink -p1
+
+at the MS-DOS command line.
+Likewise type `mclink -p2` to specify port 2.
+
+The socket at the HC end of the cable plugs straight into the serial port in expansion modules of the HC.
+
+==== Summary of straightforward usage of Link on the HC
+
+The Link software on the HC can be started by typing simply link at the Command Shell `$` prompt.
+
+To terminate the Link software at some later date, type `term link`.
+
+To discover whether or not Link software is running, type `lproc link`.
+
+If the `link` command is issued while Link is already running, a second copy of Link will be launched briefly, but will quickly exit with the error number -32 (or 224), meaning that a process `link.*` already exists.
+No harm will ensue as a result.
+
+Link allows a HC to open or save files on a remote computer in the same way as it opens and saves files on its internal memory and SSDs.
+Conversely MCLink allows a remote computer to open and save files on an HC in the same manner.
+Note that _all_ HC applications automatically possess the ability to access remote files in this way -- no special "comms software" has to be added into the applications.
+All that is required is a degree of agnosticism regarding the structure of filenames: eg it must not be assumed that directory names end in '\' characters, nor that the core parts of filenames are restricted to eight letters in
+length.Provided appropriate Plib library routines are used to manipulate ("parse") filenames, remote file access comes free.
+
+The user should note that the Link software must be left running all the time that files on the other computer are being accessed.
+
+=== Why not MS-DOS?
+
+Some would-be HC applications developers may be put off by the fact that the operating system of the HC is not MS-DOS but Epoc.
+On the face of things, this poses two problems:
+
+* applications written presupposing MS-DOS have to be rewritten before working on the HC
+* there is a learning curve that has to be negotiated, in coming to terms with the differences between Epoc and MS-DOS.
+
+With regard to the first point, there is, frankly, no way standard MS-DOS applications can transfer over to the smaller screen of a handheld computer without _some_ amount of re-writing.
+The reduced screen size of hand held computers actually means more than just "compressing" the screen display from say 80 columns to around 30; it means having to rethink some of the user interface completely (as many displays
+simply won't work in their original form, if they are compressed by such factors); the _quantitative_ change in screen size is such that it in turns leads to a _qualitative_ change in the user interface supported.
+
+However, this consideration is incidental to the main point, which is that Epoc is simply an operating system far better suited to the particular needs of computers such as the HC.
+
+Some of the special advantages of Epoc over any version of MS-DOS are:
+
+* a much more sophisticated power distribution system can be managed, resulting in significantly longer battery lifes than could ever be achieved under MS-DOS
+* pre-emptive multi-tasking is natural to Epoc, but is artificial (and hence expensive) to MS-DOS
+* Epoc supports remote file access in a way that, again, is expensive to emulate in MS-DOS
+* Epoc implements address trapping (on an 8086 chip!), amongst other measures, to prevent aberrant processes from causing a system crash: just consider how many times PC developers have to recourse to the "big red switch" when an aberrant MS-DOS application results in fatal damage to PC RAM contents, and compare this with how few times a corresponding measure is required during HC development
+* Epoc allows a change in which device drivers are loaded, without the computer having to be reset.
+
+Briefly, Epoc results in smaller programs which execute more efficiently and in a manner more in line with the intuitive expectations of end users.
+
+This applies for the programs built into the ROM as well as those developers might write.
+As a result (and this may well be the bottom line), HCs end up considerably cheaper than any corresponding MS-DOS computer.
+
+What actually lies behind the initial hesitation of many would-be HC developers is concern over the extent to which files written by MS-DOS programs on PCs can be read and updated by Epoc programs on an HC.
+Understandably developers are unwilling to upset an existing successful PC setup, even if they are prepared to learn a new programming system for the HC parts of the overall computer system.
+
+However, developers can rest assured that there is no inherent difference in file structure between MS-DOS programs and Epoc programs.
+Epoc is fully _file-compatible_ with MS-DOS.
+
+Furthermore, it should be re-emphasised that many existing programs will transfer fairly smoothly from an MS-DOS environment to an Epoc environment.
+This is the role of the Clib library, discussed in more detail in the _General Programming Manual_.
+
+Finally, bear in mind what some experienced HC developers have said: that it is actually quicker to develop programs for the HC than it is for the PC.
+In part, this is due to the rich Software Development Kit (with high-powered libraries) available for the HC.
+But it is also in part due to the fact that Epoc is for many purposes a superior operating system.
+Accordingly, the Epoc learning curve is one that is well worth climbing!

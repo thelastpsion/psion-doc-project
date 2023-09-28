@@ -1,0 +1,142 @@
+
+
+== COPY-PROTECTING SOFTWARE
+
+=== Introduction
+
+This chapter considers various mechanisms to "copy-protect" software written for SIBO computers.
+
+Possible _goals_ of copy-protection include:
+
+* software should be able to run, only from the original SSD it is supplied in
+* software should be able to run, only on one particular computer
+* first generation copies should be allowed, but not second generation copies (ie direct copies make from the original SSD would run, but not copies of these copies)
+* possibly, the number of first generation copies allowed could be limited.
+
+These different goals vary in their applicability to the different computers in the SIBO range.
+For example, software that disallowed even first generation copies would be very unwelcome on the Series 3, because it prevents _consolidation_ -- the process whereby users copy more than one different application onto the same SSD.
+It is unlikely that such software would sell at all well.
+On the other hand, this kind of _strict_ copy protection makes more sense for the HC, and for corporate ("vertical") programs generally.
+
+At the same time, software developers may wish to apply differing amounts of sophistication in their copy protection schemes -- some being willing merely to frustrate the casual would-be copier, and some being determined not to allow copying at all (if possible).
+
+This chapter does not favour one copy protection method over all others.
+Rather, it simply hints at various different possibilities.
+Software developers may find it convenient to mix and match the different proposals made, as well as others (along the same lines) that they can think of themselves.
+
+By the very nature of the subject, too much documentation would be self-defeating.
+Once any algorithm to implement copy protection becomes widely known, methods to defeat this algorithm may be developed and circulated.
+
+=== The free space method
+
+This method aims at `strict` copy protection: the software will only run if it is on the original SSD.
+This simple yet effective method turns one of the commonly debated 'disadvantages' of using Flash storage into an advantage.
+
+The method is based around the fact that when a file is deleted from a Flash SSD it remains on the pack taking up space but is no longer practically accessible.
+Assuming that an application master pack contains a deleted file, if someone were to copy this pack using the usual copy from the root including subdirectories, the resulting copy of the master pack will differ fundamentally: the deleted file no longer exists.
+This in turn means, rather conveniently, that the amount of free space on the pack will be different.
+
+Given the above you can then hard-code into your application a check to see if the figure for space on the pack matches the figure you expect: if it does then all well and good; else, do not allow the software to run.
+
+The way to find the amount of free space on an SSD is to call `p_dinfo`.
+For example, a program that prints the amount of free space on the disk the program was launched from:
+
+[source,c]
+----
+#include <p_std.h>
+#include <p_file.h>
+#include <p_sys.h>
+
+GLREF_D TEXT *DatCommandPtr;
+
+GLDEF_C INT main(VOID)
+    {
+    P_DINFO dinfo;
+
+    p_dinfo(DatCommandPtr,&dinfo);
+    p_printf("Free space is %lu",dinfo.free);
+    p_getch();
+    return(0);
+    }
+----
+
+=== First generation copying methods
+
+Methods that allow first generation copies to run, but not second generation copies, rely on a separate "AppCopy" program being provided on the master SSD, in addition to the program itself.
+
+First generation copies can only be made using the AppCopy program.
+Copies made using ordinary Copy commands will fail.
+Further, AppCopy will refuse to copy first generation copies into second generation copies.
+
+Essentially, AppCopy does not make an exact copy, but changes some of the bytes in the application program.
+This can be done, even on Flash SSDs, provided:
+
+* the original values of the bytes are all `0xFF`’s
+* the bytes are adjusted `one at a time` (assuming that a complete copy has already been made, and that this complete copy has to be altered).
+
+The last point is most important; the Flash filing system tests for the special case of only one byte being written, and in this case, alters the physical byte on the SSD.
+In other cases, the physical structure of the file is significantly changed.
+
+==== Preserving checksums
+
+Note that in adjusting bytes in a program file, care has to be taken not to disturb the code or data checksums (as reported eg by the tool `edump.exe`).
+Otherwise, the operating system will refuse to run the program, believing it to be corrupt.
+
+The checksums can be preserved in either of two ways:
+
+*  provided enough bytes are changed, the checksum can be left the same as it was originally
+* rather than changing the program part of the image file, one of the _add-files_ inside the image file should be changed (see the chapter _Building an Application_ for details of add-files).
+
+In general, the second method is preferable.
+
+==== What kind of change should be made
+
+The change made to the program file has two purposes:
+
+* the file is now recognisably a first generation copy
+* the change contains data somehow allowing this first generation copy to run, in a way preventing a straight copy of this file from running on another computer.
+
+Possible ideas on this second point include:
+
+* information from an environment variable specially created on the target computer (secretly and with a random value), by the AppCopy program
+* the date the copy was made (so that the copy will "expire" after a certain length of time)
+* details about the low-level structure of the SSD (see below).
+
+To make the mechanism less obvious to a casual browser, any information from say an environment variable ought to be stored in the file encrypted in some way.
+
+==== Restricting the number of copies made
+
+In order to restrict the number of first generation copies ever made to eight, say (which would not be unreasonable), certain bytes in the _master_ copy of the program could be changed.
+As above, these bytes would start with the value `0xFF`, and would have to be written one at a time.
+
+The documentation for the product would have to state clearly that AppCopy could only be used eight times.
+This would have the effect of making the owner of the software most wary against making cavalier bootleg copies.
+
+This method will of course only work if the SSD containing the original copy can be written to.
+This will be impossible for OTP (One Time Programmable) or masked ROM SSDs.
+In this case, information about the number of first generation copies made could be stored in another environment variable, though of course this method would be easier to subvert.
+
+=== Low level SSD information
+
+Each SSD contains a so-called "unique ID" which can be used to identify it.
+
+Another potentially very useful piece of information would be the _physical pack offset_ of the start of a nominated file on an SSD.
+An AppCopy program could create a small file on the target SSD, and then delete it, before copying the program file across.
+The physical pack offset of the start of the program file could then be written into the program file (possibly in encrypted form), for the program to check when it starts to run.
+
+Alternatively, information could be read _from the deleted file_.
+
+These types of information can be read by use of the `p_locreadpdd` function, described in the Files chapter of the PLIB Reference manual.
+
+=== Copy-protection by changing the ROM
+
+In the case of the HC, it is possible to use the tool `romwrite.exe` to overwrite portions of a file `custom$.dat` in the ROM of the HC.
+See the chapter _Introduction to the HC_ in the _HC Programming Guide_ for details of the operation of `romwrite.exe`.
+
+Programs can then check that they are running on a given specified HC.
+
+To read the contents of `custom$.dat`, just open the file as normal, specifying the full path name `rom::custom$.dat`.
+
+One other possibility is to change the contents of the ROM more radically, eg placing certain software into the ROM, with a program on an SSD refusing to run unless this software is present in the ROM.
+For more details, again see the _HC Programming Guide_.
+

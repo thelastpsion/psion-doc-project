@@ -1,0 +1,842 @@
+== COMMUNICATING WITH THE SYSTEM SCREEN
+
+=== Introduction
+
+An important aspect of the Series 3 is the way all the built-in applications communicate with the System Screen application (also known as the _Shell_ application):
+
+* The name of any file currently open is displayed in bold in the file list in the System Screen
+* This name is also displayed in any status window shown
+* On a request from the System Screen, an application can close itself down tidily, saving any changes to file as appropriate
+* Alternatively, applications can be requested to switch files, to change which file they are currently editing.
+
+Applications use two mechanisms to communicate to the Series 3 OS their preferences concerning file switching, as well as the name of the file they are currently editing:
+
+* some data is written _at compile time_ into a _shell data_ file (`.shd` file) that is linked into the application's `.app` file; this data includes the expected extension of any files to be edited, and the default directory for these files, as well as the more basic point of whether the application is file-based at all
+* other data can be written _at run time_ to various _reserved Epoc_ statics; these include the full path name of the file currently being edited.
+
+=== Creating `.shd` files
+
+==== The format of .ms files
+
+The shell data of an application (see above) is expressed in source form in a file that typically has extension `.ms`.
+For example, the contents of a file `tele.ms` could be:
+
+.tele.ms
+----
+Tele.TEL
+\TEL\
+3
+----
+
+Running the tool makeshd as follows
+
+[console]
+----
+> makeshd tele
+----
+
+would produce the file `tele.shd` from `tele.ms` (barring syntax errors in the `.ms` file).
+
+The `.shd` file can then be combined into the final `.app` form of an application as discussed in the previous chapter.
+
+The first line in a `.ms` file has general form
+
+----
+<Name>[<.EXT>]
+----
+
+with the extension `.EXT` only being present for file-based applications.
+In that case, `.EXT` defines the _default extension_ for the application.
+In all cases, `Name` is the so-called _public name_ of the application.
+This must be a valid file name, that is, it must start with a letter and not exceed eight characters.
+
+The second line in a `.ms` file gives the _default directory_ for an application.
+This can be left blank for non file-based applications.
+For example, the `.ms` file for the built-in _Time_ application could be
+
+----
+Time
+
+8000
+----
+
+with the second line left blank.
+
+The third line in a `.ms` file gives the type of the application (sometimes called the type number of the application).
+
+A `.ms` file can have fourth, fifth, sixth ... lines, but only if `2000` has been added to the application type, so that the application has _multi-lingual_ shell data (see below).
+
+At present, there is no scope for the inclusion of comments in a `.ms` file.
+
+Note that the entire contents of a .ms file is case sensitive.
+Eg an application with first line
+
+ RunGame
+
+in its `.ms` file will have public name _RunGame_, whereas an application with first line
+
+ Rungame
+
+in its `.ms` file will have the distinct public name _Rungame_.
+Further, the default extension and default directory should always be given in upper case (otherwise the file list may fail to display any files).
+
+==== Default extension
+
+The significance of the default extension for a file-based application is as follows:
+
+* Files will be shown in the file list for the application in the System Screen only if their extension matches the default (with the exception that files are _always_ shown -- in bold -- if they are currently the open file of an application)
+* The System Screen will pass the specified default extension to the application as part of its command line, when it is started
+* Typically, applications will use filename selectors in dialogs which hide extensions matching the default (eg showing _Tele_ rather than _Tele.tel_), and may even omit other files from the initial list presented.
+
+==== Public name
+
+The significance of the public name of an application is as follows:
+
+* This is the name by which the System Screen refers to the application, eg when confirming that the application be "Removed", or when allowing an application button to be assigned to the application
+* This name will be displayed in the file list for the application, in the System Screen, in any case when the list would otherwise be empty.
+
+The contents of `Name[.EXT]` must in all cases be a valid filename, ie Name cannot exceed eight characters in length, `EXT` cannot exceed three characters in length, and there must be no embedded spaces (etc).
+
+==== Default directory
+
+Files will be shown in the file list for the application in the System Screen only if they are located in a directory whose name exactly matches the default (with the exception that files are always shown -- in bold -- if they are currently the open file of an application).
+
+Default directories for applications are usually top level, as in `\TEL\`.
+However, they can equally well be subdirectories, as in `\TEL\PRIVATE\`, with the limitation that the total length cannot exceed 20 characters
+(this count including a terminating zero at the end of the directory path name).
+
+==== Application type numbers
+
+The significance of an application's type number is as follows:
+
+* A type of `0` means that the application a) will have no file list when installed in the system screen - instead there will be only one entry, giving the public name of the application b) will receive no _Switchfile_ commands from the System Screen and c) no filename will be specified in the command line.
+Type `0` applications can have only one copy running at any one time.
+* A type of `2` is used to restrict a file based application such that only one copy can run at any one time -- this is the case for the built-in World application.
+In contrast see types `0` and `3`.
+* A type of `3` means that the application a) will have a file list when installed in the System Screen, and b) can receive _Switchfile_ instructions.
+More than one copy of the application can be run at any one time.
+* A type of `4` means that the application will have a file list in the System Screen, but will never be sent _Switchfile_ instructions: however, it should read the command line on its start up (an example is the built-in RunOpl application)
+* Finally, a type of `5` means that the application is a pure file list application, ie not a real application at all, but just an icon to group together various applications or utility programs (like the built-in _RunImg_ icon) -- see below for more details.
+
+The application's behaviour may be further modified by adding one or more of the following values to the type number:
+
+[cols="1,3"]
+|===
+|8000
+|prevents _Switchfile_ messages of the Create sort being sent to the application
+(this makes sense for an application such as a file dumper, which can dump the
+contents of existing files, but cannot meaningfully create the file it is going to dump)
+
+|4000
+|prevents the application being sent _Shutdown_ messages -- this will also prevent the application being Killed from the System Screen (but not, for example, from the _Spy_ application released as part of the SDK)
+
+|2000
+|indicates that the application's `.ms` file contains public names for more than one _different language_ version (see below)
+
+|1000
+|indicates that the `.pic` file contains a 48 by 48 Series 3a icon (preceded by a 24 by 24 icon if the application is to run on the Series 3 as well as the Series 3a).
+The Series 3 does not recognise this flag and will simply read the 24 by 24 icon if present.
+
+|100
+|the application should not be sent an exit message so that, for example, pressing kbd:[Delete] acts as Kill application.
+The Series 3 does not recognise this flag.
+
+|80
+|on selecting "Create new list" from the System Screen, the resulting dialog box will contain an extra line, for specifying Text editor or Word processor type.
+The Series 3 does not recognise this flag.
+|===
+
+
+==== Multi-lingual forms of `.ms` files
+
+Suppose the Data application were to be translated into French, German, and Italian, and that its public names in these languages were to be _Fiche_, _Daten_, and _Archivi_, respectively.
+In that case, an appropriate `.ms` file would be as follows:
+
+----
+Data.DBF
+\DAT\
+2003
+01Data
+02Fiche
+03Daten
+05Archivi
+----
+
+Here, the `2000` in the application type means that the remaining lines in the `.ms` file are each made up as follows:
+
+<language number><public name in that language>
+
+where language numbers are as documented in the `p_getlanguage` part of the _PLIB Reference_ manual.
+
+The same rules apply to the public names for other languages as to the default public name defined in the first line of the `.ms` file.
+
+It is not possible to change the default extension or the default directory from one language to another.
+
+Applications which are intended to be capable of being run on either mono- or multi-lingual Series 3s should adopt the multi-lingual form of `.ms` file, and simply accept that the public name will be incorrect on mono-lingual machines.
+
+For multi-lingual machines, the System Screen uses the following rules to decide what the public name of the application should be:
+
+* the current language number is obtained by a call to p_getlanguage
+* if this matches any language for which a public name is explicitly defined in the shell data, that public name is used
+* otherwise, the default public name is used (as given on the first line of the `.ms` file).
+
+For the sake of minimising the size of a multi-lingual `.shd` file as much as possible, it is evidently possible to omit any lines such as
+
+ 01Data
+
+which merely define the public name for some language to be what it would have been in any case, were this line omitted (in view of the contents of the _first_ line of the `.ms` file).
+
+==== Pure file list applications
+
+If an application (Utils, say) has type 5, and the user presses kbd:[Enter] when the highlight is over some file `Xyz.abc` in the file list for that application, the System Screen makes no attempt to run the application _Utils_.
+Rather, it assumes that `Xyz.abc` is itself a program, and attempts to run that.
+In other words, instead of executing Utils and passing the filename `Xyz.abc` as part of the command line, it executes `Xyz.abc` (without any command line being passed).
+
+For example, the .ms file for the built-in "application" RunImg is as follows:
+
+----
+RunImg.IMG
+\IMG\
+8005
+----
+
+This means that the file list for _RunImg_ lists `.img` files from `\IMG\` top-level directories -- each of which are program files.
+
+Note that unless the utility programs cooperate in some limited way, when run they will be listed (in bold) under the RunImg icon, rather than under any other pure file list icon.
+This is explained in the section below on the Epoc reserved static `DatProcessNamePtr`.
+
+In practice, the simplest way to create another pure file list application is probably to use the technique of aliasing, as discussed immediately below, to alias _RunImg_.
+
+=== Aliasing applications
+
+Some file-based applications may end up with large file lists.
+It may be desirable to separate a file list into two or more separate lists, for example (for the _Word_ application) all correspondence going in one file list, all poetry in another, and so on.
+These file lists could be distinguished, on the System Screen, by having distinct icons, and different application buttons could be used to cycle round running instances of these tasks.
+
+Going further, it may be desirable for the _behaviour_ of the application to alter, depending on which type of file is open.
+For example, the behaviour of the built-in text editor is different for `.wrd` files (when the application is seen as _Word_) from `.opl` files (when the application is seen as _Prog_).
+
+The concept of aliasing an application is designed to meet these requirements.
+For each required new file list, an alias file (`.als` file) should be installed in the System Screen.
+In practice the user can do this on the
+Series 3a using the "Create new list" item from the "Special" menu (try it out ...).
+
+Broadly speaking, the contents of a .als file match those of a .shd file: the public name, default extension, and default directory are all defined, as well as the application type number.
+However, the `.als` file goes beyond the `.shd` file in that it also specifies:
+
+* the name of the application that is being aliased
+* (optionally) some _alias info_ that the System Screen should pass to the application when it is run, via the command line, to configure its behaviour in some special way.
+
+==== Creating .als files
+
+An `.als` file is produced from a `.ma` file and a `.pic` file by running the tool makeals.
+The three files all have the same root name (ie disregarding the extensions).
+For example, the command
+
+ makeals letter
+
+produces the file `letter.als` from `letter.ma` and `letter.pic`.
+
+The `.pic` file is the icon to use.
+The process of creating `.pic` files is discussed in the previous chapter.
+
+The `.ma` file is a source file similar in format to a `.ms` file.
+For example, the contents of a file `letter.ma` could be:
+
+----
+Letter.let
+\WRD\LET\
+3
+Word
+----
+
+in which there is a fifth line which is blank (_makeals_ will give an error if the fifth line is omitted altogether).
+
+Just as there are multi-lingual forms of `.ms` files, there are also multi-lingual forms of `.ma` files.
+However, in practice these are of limited use, for technical reasons.
+This is discussed in its own section (which the majority of readers can skip) at the end of this chapter.
+
+The first three lines of a `.ma` file correspond exactly to those of a `.ms` file.
+The fourth file is the public _name of the application to alias_.
+The fifth line gives the alias info, which is a zero-terminated string of up to eight characters.
+
+In most cases, the application type will be the same for the alias file as for the application being aliased.
+However, the public name, the default extension, and the default directory are all commonly varied.
+
+Note that the public name of an alias must differ from that of the application it is aliasing.
+Otherwise, seeking to install the alias in the System Screen will have no effect (it is not possible to have two different file lists, each with the same public name).
+
+Incidentally, no check is made, at the time of installing an alias file, that the application it aliases is itself currently installed.
+This check is only made when an instance of the alias is to be started.
+
+==== Active aliasing and passive aliasing
+
+In theory, all applications are capable of being aliased, without them needing to make any conscious provision for this possibility.
+This is known as _passive_ aliasing.
+
+Other applications pay explicit attention to any alias info that may be passed to them on their command lines, and adjust their behaviour according to the contents of this info.
+This is known as _active_ aliasing.
+An example of active aliasing is that of the built-in text editor, as described in the following section.
+This is the only one of the applications built into the Series 3 and Series 3a that supports active aliasing.
+
+Any other program that supports active aliasing is free to interpret alias info passed to it in any way that it wishes.
+There is no obligation to mimic the detailed rules obeyed by the text editor.
+
+==== Active aliasing in the built-in text editor
+
+If the alias info is a null string, the text editor enters Word mode, with multi-level outline facilities, styles and emphases, and so on.
+
+Note that it is not unreasonable for an alias to define null alias info.
+This allows the creation of aliases of the text editor that behave in exactly the same way as the built-in Word application, but differ from each other in terms of their default extensions, default directories, and/or public names.
+
+If there is any non-null alias info, the text editor enters one of a number of other modes, with the mode depending on the first character of the alias info.
+Some of these modes are not available on Series 3 machines.
+At the time of writing, the allowed first characters and the corresponding modes are:
+
+[cols="1,3"]
+|===
+|O
+|OPL program editor
+
+|S
+|Comms script program editor
+
+|$
+|Plain text editor (not Series 3)
+
+|/
+Word processor with custom template (not Series 3)
+|===
+
+The program editor mode is available on all machines.
+In this mode there is no access to the style and emphasis subsystems, the corresponding menu commands being replaced by options to "translate", "run", "show error" and set "indentation".
+
+In this mode, the first letter of the alias info denotes the nature of the program that is being edited.
+It actually identifies the program to invoke to effect any "translate" and (possibly) "run" commands from the user.
+The generic name of this program is `sys$prg?.img`, with the question mark being filled in from the first letter of the alias info.
+Thus the Prog alias has '`O`' for the first letter of its alias info, and so the OPL translate/run program `sys$prgo.img` is used.
+In contrast, the Script editor from the communications ROM has '`S`' for the first letter of the alias info, so that the program sys$prgs.img is used.
+
+In program editor mode the second letter of the alias info should be '`R`' if the program is of a type that understands "run" instructions in addition to "translate" ones.
+Any other second character disables the "run" command option.
+The following three letters (e.g. '`OPO`' or '`SCO`') denote both the expected file extension and the expected top-level directory where any translated output will by default be placed.
+(This information is used by the editor when offering the user a suitable filename to "run").
+
+On the Series 3a a final '`*`' character may be added to the alias info.
+This has the effect of adding an "S3 Translate" menu option.
+
+The remaining modes are not available on Series 3 machines.
+
+Alias info that consists of a single '`$`' character selects a plain text editing mode.
+In this case the program-related menu options are suppressed, with only an "indentation" option being offered.
+
+A variant on the _Word_ mode is set by alias info that consists of a single '/' character.
+This behaves in a similar way to the _Word_ application, with the exception that a specific template file is loaded whenever a new file is created.
+The template must have the same name as the aliased application and must be located on the current drive at the time the new file is created.
+Thus, an alias created from the following `.ma` file:
+
+----
+Letter.LET
+\LET\
+1083
+Word
+/
+----
+
+would, on creation of a new file, automatically load the template file `\wdr\letter.wrt`, provided it exists on the current drive.
+Note that, in this mode, the value 80 must be added into the application type number.
+If it is not, the automatic loading of the template is disabled.
+
+==== How aliasing works
+
+Part of the mechanism of aliasing is handled by the System Screen:
+
+* creating a new file list
+* listing the appropriate files in the new file list
+* allowing the user to assign a new application button to the new file list
+* creating a suitable command line to pass to the relevant application, when the user chooses to start an instance of the alias (by pressing kbd:[Enter] on an entry in the file list).
+
+However, other parts of the mechanism of aliasing rely on the application paying suitable attention to the details of the command line passed to it.
+Failure to do this will diminish the effect.
+
+Thus even passive aliasing relies on some cooperation from the application being aliased.
+For example, an application that is determined that it knows what its public name is (say _Word_) and which writes this to `DatProcessNamePtr` (see below) in all cases, despite any different public name being passed to it on the
+command line, will frustrate the intent of any aliasing application:
+
+* any application button assigned to the alias by the user will be ineffective
+* running instances of the alias will appear (in bold) in the wrong file list in the System Screen.
+
+This is just one reason why all serious applications should analyse the command line passed to them, as part of their initialisation procedures.
+
+There are routines in both the Hwif library and the Hwim dyl to assist in analysing the command line.
+
+=== Epoc reserved statics
+
+The values of the Epoc reserved statics `DatProcessNamePtr`, `DatLocked`, `DatStatusNamePtr`, and DatUsedPathNamePtr all have special significance for Series 3 applications.
+The values of these variables for different applications are read at various times by the System Screen and also by the Window Server.
+An application which fails to write suitable data to these statics may find that:
+
+* an incorrect name is displayed in any status window shown in the application
+* instances of the application are shown in the wrong file list in the System Screen
+* _Shutdown_ or _Switchfiles_ messages arrive at inopportune moments from the System Screen (see below for more on these messages)
+* assigning an application button to the application in the System Screen has no effect.
+
+In general, applications should write to these reserved statics:
+
+* on initialisation (after having analysed the contents of their command line)
+* whenever a new file is opened
+* whenever the application is about to go "busy" over an extended period of time.
+
+There are routines in both the Hwif library and the Hwim dyl that assist with keeping these reserved statics up to date.
+
+While debugging using the SIBO Debugger, the values of reserved statics can be determined by using the "Magic Statics" menu command.
+
+==== `DatProcessNamePtr` (`0x22`)
+
+This static is read by the System Screen when deciding which file lists bolded running applications should be placed into.
+It is also read by the Window Server when deciding which action to take when an application button is pressed.
+Finally, it is read by the System Screen in response to any "Quit application" menu commands, to determine how to implement this request (ie how much cooperation the System Screen might expect from the application).
+
+The way the file lists are built in the System Screen is as follows:
+
+* for each list, the set of all eligible files is compiled; these will all be displayed non-bolded
+* then for each running application, it is decided which file list the application belongs to
+* this involves reading the value of `DatProcessNamePtr` for the application
+* further, for each running application, the name of the file currently open (if any) is decided
+* this involves reading the value of `DatUsedPathNamePtr` for the application (and possibly also the value of DatProcessNamePtr)
+* if this name matches any entry in the file list, that entry is removed (so that it is no longer displayed non-bolded)
+* the name of the open file is added to the list, in bold.
+
+Clearly, the lists will be misleading if the running application is assigned to the wrong list.
+
+The rules for assigning a running application to a particular file list are straightforward:
+
+*  the preferred public name of the application is read from DatProcessNamePtr
+* if this matches the public name of any existing file list, the application is assigned to that list
+* otherwise, the application is assigned to the RunImg list.
+
+==== More on the file lists in the System Screen
+
+Incidentally, any entry starting with `Sys$` is never displayed in any file list.
+Further, the name Link is never displayed in the RunImg list.
+These rules prevent the display of private system processes within the System Screen file lists.
+
+Additionally, files with the "hidden" attribute set are never displayed in a file list in the System Screen -- unless the file is open within an application (in which case it will be displayed in bold).
+
+In order to check for the existence of hidden files or file starting with `Sys$` in a directory, the user should press kbd:[Tab] to enter "directory" mode of the System Screen.
+
+It is also possible to task to an application whose open file starts with `Sys$` by repeatedly pressing the kbd:[Shift+System] key combination, which tasks round all running applications (that are clients of the Window Server).
+
+==== Assigning application buttons
+
+Suppose that the user has installed the application Tele, and has assigned the application button
+kbd:[CONTROL+WORD] to it.
+The following is what happens when the user presses kbd:[Ctrl+Word]:
+
+* at all times, the System Screen maintains a data structure associating each of the 14 possible application buttons to public names of applications
+* the address of this data structure, within the System Screen dataspace, is known to the Window Server (in fact it is kept at `DatApp1`)
+* when knd:[Ctrl+Word] is pressed, the Window Server consults this data to determine the public name that is currently associated with this application button (ie Tele in this example)
+* the Window Server next checks whether the public name of the current foreground application matches Tele, reading the public name from `DatProcessNamePtr`
+* if so, this application is sent a special key-press event, with keycode value equal to `W_KEY_MODE` (as defined in `wskeys.h`) -- unless the kbd:[Shift] modifier is also held down, in which case the algorithm continues as below
+* otherwise, the clients of the Window Server are scanned in current task order, to see whether any can be found with the required public name
+* if any can be found, this is made foreground
+* failing this, a message is sent to the System Screen to position, if possible, to the file list associated with the given public name
+* if no such file list exists, the System Screen beeps and gives a suitable error message.
+
+The crucial point in this is that, once again, the public name of the application has to be written to
+`DatProcessNamePtr`.
+
+Incidentally, it is now clear why pressing the kbd:[Ctrl+System] key (assigned to RunImg), or any other application button assigned to a pure file list application, often fails to have the desired effect (of bringing to foreground a running application listed in the relevant file list).
+The point is that these applications are generally run without any command line being passed to them, and so they cannot set up a suitable value at `DatProcessNamePtr` merely by analysing their command lines.
+
+Also note that the assigned buttons differ in one aspect of their behaviour depending on the machine used.
+Consider an application, the built-in database say, that is currently running in the foreground.
+On the Series 3 pressing the kbd:[Data] button would change the application from search mode into change mode, and, on a second press, back into search mode.
+On the Series 3a pressing the kbd:[Data] button has no effect when there is currently only one copy of the application running.
+However when multiple copies are running, then pressing the kbd:[Data] button has the effect of sequentially bringing each copy into foreground -- simultaneously holding down the shift key reverses the order of bringing into foreground.
+Try out the Data button while running multiple copies of the database ...
+
+==== `DatUsedPathNamePtr` (`0x3e`)
+
+The Epoc reserved static `DatUsedPathNamePtr` is read solely by the System Screen, which assumes that if it is non-null for an application, `DatUsedPathNamePtr` points to a full path specification of the file currently open in the application.
+As described above in the section on `DatProcessNamePtr`, these filenames are used when generating the file lists in the System Screen:
+
+* any open file matching an entry in the non-bold section of the file list replaces that entry
+* the filename is parsed and rearranged, eg from the form `LOC::A:\WRD\SHOPPING.WRD` into _Shopping[A]_.
+
+In case `DatUsedPathNamePtr` is null, the value of the string at `DatProcessNamePtr` (if any) is used instead: failing that, the process name (as returned by p_pname) is used.
+
+Initially, the name of the open file is part of the command line (see below).
+However, when this has to be changed -- either as a result of an _Open_ or _Save_ as command inside the application, or in response to a _Switchfile_ request from the System Screen -- a new buffer has to be used for this purpose.
+(The command line buffer is sized to precisely the right length needed for the initial file.)
+
+Typically, file-based applications will maintain a permanent buffer, of length `P_FNAMESIZE`, to store any change in the name of the file open.
+Once the new name has been copied into this buffer, a call such as `hSetUpStatusNames` (described below) should be made, to adjust all Epoc statics as appropriate, including `DatUsedPathNamePtr`.
+
+==== `DatStatusNamePtr` (`0x3c`)
+
+The Epoc reserved static `DatStatusNamePtr` is used to determine which text string should be displayed as the name of the application in any status window shown for that application.
+
+If non-zero, this is assumed to point to a string giving the text to use, with the text being clipped at the first dot encountered, and in any case after eight characters.
+The text is also converted into standard capitalised form.
+Thus if `DatStatusNamePtr` points to "`DIARY.AGN`", the text _Diary_ will be displayed in the status window.
+
+The rules for what text to display when DatStatusNamePtr is null are the same as those employed when `DatUsedPathNamePtr` is null (see above).
+
+==== DatLocked (0x3a)
+
+When the user attempts to terminate an application using the "Quit application" command in the System Screen, or to change the file currently open, by pressing kbd:[Enter] on another entry in the file list for that application, the System Screen checks the value of the Epoc reserved static DatLocked for that application.
+
+If this is non-zero, a message _Application is busy_ is displayed, and the user's request is refused.
+
+Applications which enter a state in which they are unable to respond to such requests from the System Screen should accordingly set `DatLocked` to `TRUE`.
+Good programming practice dictates that `DatLocked` be set back to `FALSE` again as soon as possible afterwards.
+
+=== The Series 3 command line
+
+The command line communicates the following information to a Series 3 application about to start:
+
+* the _public_ name of the application
+* the default extension for files used, if any
+* any alias information specified in an alias file
+* the full path name of the file to open, if any
+* whether this file should be opened or created anew
+* exceptionally, whether the application is to connect to the Window Server in background.
+
+When a program starts, its command line is placed in an allocated cell within the heap of the application, with the address of this cell being written to the Epoc reserved static `DatCommandPtr`.
+See the section on `p_execc` in the _PLIB Reference_ manual for some general information about `DatCommandPtr`.
+
+The command line for any Epoc program always starts with a zero-terminated string given the full path name of the process being run.
+The byte after this gives the length of any following data.
+Ordinarily, when referring to "the command line", it is this latter data that is in mind.
+
+For example, suppose the user presses kbd:[Tab] inside the Prog file list in the System Screen, navigates using
+the file selector to `loc::m:\dat\data.dbf`, and then presses kbd:[Enter].
+The full command line passed to the application thereby chosen (_Word_) is as follows:
+
+ ROM::WORD.APP<0><29>OProgram<0>.OPL OROPO<0>LOC::M:\DAT\DATA.DBF<0>
+
+The `<29>` immediately following the zero at the end of the first zero terminated string indicates that the remainder of the command line is 0x29 bytes long - as is indeed the case.
+
+The next byte after this is the so-called _command byte_:
+
+* a command byte of '`O`' means, for a file-based application, that a named file is to be opened
+* a command byte of '`C`' means, for a file-based application, that a named file is to be created
+* a command byte of '`D`' means the application is to connect to the Window Server in background.
+
+A command byte of '`D`' arises only for the built-in applications, and is not considered in the remainder of this documentation.
+(When it _does_ arise, it is handled automatically by code in `hwim.dyl`, which silently translates it into one of the other two cases.)
+
+Following the command byte, there is a zero-terminated string giving the public name of the application.
+
+After this comes another zero-terminated string, containing both the default extension and (if present) the alias info.
+The alias info, if present, is separated from the default extension by a space.
+
+Finally, yet another zero-terminated string gives the full path name of the file to open or create.
+
+With regard to the above example:
+
+* The command byte of the application is '`O`'
+* The public name of the application is "`Program`"
+* The default extension is "`.OPL`"
+* The alias info is "`OROPO`"
+* The name of the file to open is "`LOC::M:\DAT\DATA.DBF`".
+
+==== Summary of command line format
+
+In summary, the format of the command line of a Series 3 application is as follows:
+
+ <command byte><public name><0>[<default extension>[<space><alias info>]<0><full pathname><0>]
+
+==== Supplying a command line from the SIBO Debugger
+
+Ordinarily, applications are executed from the System Screen, which automatically constructs a suitable
+command line.
+
+When executing an application from the Debugger (or from an alternative "Shell" program), the command line has to be supplied explicitly.
+Some examples follow:
+
+* `SDBG TELE "CTELE",0,"LOC::M:\TEL\TELE.TEL"` -- debug the application tele giving it the public name Tele, and have it Create the file `LOC::M:\TEL\TELE.TEL` on start up
+* `SDBG DA2 "ODAYS",0,"LOC::A:\ANN\DAYS.ANN"` -- debug the application da2 giving it the public name Days, and have it Open the file `LOC::A:\ANN\DAYS.ANN` on start up
+* `SDBG JO1 "CJOKER",0,0` -- debug the application jo1 (which is not file-based), giving it the public name `Joker`.
+
+These examples take advantage of the following processing of the command line by the SIBO Debugger:
+
+* parameters entered as a string ("...") are passed on to the program with a zero terminating the string
+* parameters given in numeric form (eg `0`) are passed on to the program as single bytes
+* adjacent parameters separated by commas are concatenated.
+
+One drawback of the command line processing of the SIBO Debugger should be pointed out: everything is automatically upper-cased.
+This means that if an application button has, for example, been assigned to the public name _Days_, no application run in this way from the SIBO Debugger will ever be tasked to as a result of the user pressing the corresponding application button (for public names are in general case-sensitive).
+
+==== From command line to reserved statics
+
+As mentioned earlier in this chapter, an application should analyse its command line on start-up, and should write various values from this command line into Epoc reserved statics as a result.
+
+As an example of how this could be done, there follows the source code for two Hwif routines:
+
+[source,c]
+----
+GLDEF_C VOID hSetUpStatusNames(TEXT *pb)
+    {
+    TEXT buf[P_FNAMESIZE];
+    P_FPARSE crk;
+
+    DatUsedPathNamePtr=pb;
+    p_fparse(pb,0,&buf[0],&crk);
+    DatStatusNamePtr=pb+P_FSYSNAMESIZE+crk.device+crk.path;
+    }
+
+GLDEF_C INT hCrackCommandLine(VOID)
+    {
+    INT ret;
+    TEXT *pb;
+
+    pb=DatCommandPtr;
+    pb+=p_slen(pb)+1;
+
+    if (!*pb++)
+        ret=0;
+    else
+       {
+        ret=(*pb++);
+        DatProcessNamePtr=pb;
+        pb+=p_slen(pb)+1;
+        pb+=p_slen(pb)+1;
+        if (*pb)
+            hSetUpStatusNames(pb);
+        else
+            DatStatusNamePtr=DatProcessNamePtr;
+        }
+    return(ret);
+    }
+----
+
+For details of the `DatCommandPtr` and other reserved statics see the _Processes and Inter-Process Messaging_ chapter of the _PLIB Reference_ manual.
+
+==== Applications that disregard their command line
+
+Simple applications - especially those that are not file based - have no need to pay any attention to the command line passed to them by the System Screen.
+In this case, the various relevant Epoc statics are left at their default (zero) values.
+This fact is picked up by the System Screen and by other parts of the OS, with the following results:
+
+* The name displayed in any status window and in the file list in the System Screen is just that of the application `.app` file
+* If the user requests the application to be shut down, from the System Screen, the application is shut down by the OS, without the application itself being informed of this fact (just as if the user had selected the _Kill_ option in the System Screen).
+
+In case an application wishes to do its own processing in response to a _Shutdown_ request issued by the user in the System Screen, it must therefore make a call to a routine such as `hCrackCommandLine` during its initialisation.
+This is true even if the application is not file-based.
+
+One final drawback of an application not processing its command line is that users will be unable to assign application buttons with any effect to that application.
+Suppose a user assigns kbd:[CONTROL+WORLD] to a version of the _Spy_ application, for example, that fails to write anything suitable to `DatProcessNamePtr`.
+If the user subsequently presses the key combination kbd:[Ctrl+World], the _Spy_ application will fail to be brought into foreground -- thus spoiling the whole purpose of assigning the application button.
+
+==== Creating directories when required
+
+In contrast to file selectors on other systems, those on the Series 3 allow users to specify paths that do not yet exist.
+This can happen fairly commonly, for example as follows:
+
+* The user inserts a brand new solid state disk into drive A
+* A _Save as or New file_ menu command is invoked
+* The user adjusts the disc selector to this new disk
+* The user types eg "Backup" into the filename editor.
+
+Then assuming the default directory for the application is `\DIR\` and the default extension is `.EXT`, the filename returned to the application is
+
+ LOC::A:\DIR\BACKUP.EXT
+
+even though the directory `\DIR\` does not exist yet, on the specified disk.
+
+It is the responsibility of application programs to test for this case and to create the required directories.
+
+=== Messages from the System Screen
+
+==== Shutdown messages
+
+Series 3 applications can receive _Shutdown_ messages from the System Screen, as an instruction to shut
+themselves down tidily, saving any changes to file as required.
+
+These messages can arise when the user presses kbd:[Delete] while highlighting a running task in the System Screen.
+However, as mentioned above, if the application has set its `DatLocked` to `TRUE`, the System Screen instead presents an _Application is busy_ message.
+
+Incidentally, applications are sent _Shutdown_ messages only if they have a non-zero value of `DatProcessNamePtr`.
+The System Screen assumes that any application that has left this Epoc reserved static at its default (zero) value is unlikely to be prepared to respond to Shutdown messages.
+In that case, the System Screen instead calls `p_pterminate` to terminate the application.
+
+Finally, note that any application which has 4000 included in its application type number will never be sent a Shutdown message from the System Screen; instead, the System Screen will display the message _Cannot quit application_.
+Note that this blocking mechanism was designed for internal use only, and should not be used without good reason.
+
+==== Switchfiles messages
+
+Series 3 applications can receive _Switchfiles_ messages from the System Screen, as an instruction to close down their existing open file, and to open or create another one.
+
+These messages can arise when the user presses kbd:[Enter] while highlighting a file within that application's file list in the System Screen.
+However, if the application has set its DatLocked to `TRUE`, the System Screen instead presents an Application is busy message.
+
+_Switchfile_ messages will only ever be sent to applications with basic type number 2 or 3.
+Applications whose type numbers include 8000 can receive Switchfile messages of the Open sort, but not of the Create sort.
+
+==== How messages from the System Screen are received
+
+There are two parts to an applications receiving a Shutdown or Switchfiles message from the System Screen:
+
+* the application receives notification that some message from the System Screen has been sent
+* the application calls `wGetCommand` to determine the contents of the message.
+
+In turn, the initial notification can be received in either of two ways, depending on whether the application is receiving events from the Window Server directly (by calling `wGetEvent` or a variant), or as "extended keypresses" via the console device (as occurs for example in Hwif programs):
+
+for the protocol in the first case, see the discussion on `WM_COMMAND` in the _Window Server Reference_ manual
+
+for the protocol in the second case, see the discussion on `P_EVENT_READ` in the Console chapter of the _I/O Devices Reference_ manual.
+
+In either case, the initial event prompts the application to call `wGetCommand`, to obtain the so-called _new command line_ giving more details about the event.
+
+==== Contents of the new command line for System Screen messages
+
+The parameter passed to wGetCommand must be the address of a buffer having at least `P_FNAMESIZE` (`128`) bytes.
+The new command line is written into this buffer.
+
+The first byte of the new command line will be one of '`X`', '`O`', or '`C`':
+
+[cols="1,3"]
+|===
+|'`X`'
+|means the command is a Shutdown message
+
+|'O'
+|means the command is a Switchfiles message, with a specified file to be opened
+
+|'C'
+|means the command is a Switchfiles message, with a specified file to be created.
+|===
+
+In the case of _Switchfiles_ messages, the remainder of the new command line gives the full pathname of the file to open or create.
+
+An example of code that responds to notification of a message from the System Screen is as follows:
+
+[source,c]
+----
+LOCAL_C VOID ProcessSystemCommand(VOID)
+    {
+    UBYTE buf[P_FNAMESIZE];
+    wGetCommand(&buf[0]);
+    if (buf[0]=='X')
+        ExitApplication();
+    SaveIfChanged();
+    if (buf[0]=='C')
+        CreateNewFile(&buf[1])      /* remainder of message is ZTS of file to create */
+    else                            /* buf[0]=='O' */
+        OpenExistingFile(&buf[1]);  /* remainder of message is ZTS of file to open */
+    }
+----
+
+==== Other possible types of messages
+
+At the time of writing, the command byte of new command lines (as read by `wGetCommand`) is restricted to one of the three values '`X`', '`O`', or '`C`'.
+It is possible, however, that some future application might send messages to other applications having different command bytes.
+
+These messages would be sent by means of the `wSendCommand` function, as described in the _Window Server Reference_ manual.
+(Note that these messages are not the same thing as IPC (inter-process communication) messages; nor are they the same as object-oriented messages.)
+
+In order to be future proof, an application should arguably test explicitly for all expected values of the command byte, and should ignore values other than those expected.
+The above code fragment would therefore need to be modified.
+
+=== Multi-lingual aliasing of `Word.app`
+
+This section can be omitted by all readers, except those who wish to write a multi-lingual alias of `Word.app`.
+
+The reason why `.als` files as created by `makeals.exe` cannot be used in this case is that these files have to contain the public name of the application being aliased.
+However, the public name of `Word.app` can vary from language to language, and there is no facility to track this within an ordinary `.als` file.
+
+To surmount this problem, the `.als` file can be re-written _as a program_.
+
+For example, the following code provides a successful multi-lingual alias for Word.app:
+
+[source,c]
+----
+#include <p_std.h>
+#include <p_file.h>
+#include <epoc.h>
+#include <rscfile.xg>
+#include <p_sys.h>
+
+#define R_STRARRAY_APPNAMES 78
+
+GLREF_D UBYTE *DatCommandPtr;
+
+GLDEF_D TEXT olibDyl[]="OLIB.DYL";
+GLDEF_D TEXT shellImg[]="ROM::SYS$SHLL.IMG";
+GLDEF_D TEXT wordNameFmt[]="ROM::%s.APP";
+GLDEF_D TEXT aliasInfo[]={'S','R','S','C','O'};
+
+LOCAL_C TEXT *skipStr(TEXT *p)
+    {
+        return(p+p_slen(p)+1);
+    }
+
+#pragma save,ENTER_CALL
+
+LOCAL_C INT getWordFspec(
+/*
+Get full file spec of Word.APP using shell's resource file.
+Returns 0 if successful, leaves if error.
+*/
+    TEXT *fSpec)      /* To receive name */
+    {
+    TEXT *pAppNames;
+    VOID *rsc;
+    HANDLE cat;
+
+    p_findlib(&olibDyl[0],&cat);
+    rsc=f_newlibh(cat,C_RSCFILE);
+    p_send3(rsc,O_RS_INIT,&shellImg[0]);
+    p_send4(rsc,O_RS_READ,R_STRARRAY_APPNAMES,&pAppNames);
+    p_atos(fSpec,&wordNameFmt[0],skipStr(pAppNames+1)); /* Copy to 2nd string */
+    p_free(pAppNames);
+    p_send2(rsc,O_DESTROY);
+    return(FALSE);
+    }
+
+    #pragma restore
+
+GLDEF_C VOID main(VOID)
+    {
+    TEXT fSpec[P_FNAMESIZE];
+    UBYTE comBuf[E_MAX_COMMAND_BUFFER+1];
+    TEXT *pCommand;
+    TEXT *pAlias;
+    TEXT *pEndAlias;
+    TEXT *p;
+    HANDLE pId;
+    INT len;
+
+    p=skipStr(DatCommandPtr);
+    len=(*p);
+    pCommand=(p+1);
+    pAlias=skipStr(pCommand);
+    pEndAlias=skipStr(pAlias)-1;    /* Point to end 0 */
+
+    p=p_bcpy(&comBuf[0],pCommand,pEndAlias-pCommand);
+    p=p_bcpy(p,&aliasInfo[0],sizeof(aliasInfo));
+    p_bcpy(p,pEndAlias,len-(pEndAlias-pCommand));
+
+    if ((pId=p_enter2(getWordFspec,&fSpec[0]))<0)
+        goto fail;
+    if ((pId=p_execc(&fSpec[0],&comBuf[0],len+5))<0) /* Run Word */
+            goto fail;
+    p_setpri(pId,p_getpri(p_getpid())-1);
+    pId=p_presume(pId);            /* Won't run till I've exited */
+fail:
+    p_exit(pId);
+    }
+----
+
+This program uses the fact that the filename of the _Word.app_ application is always stored in the 78th
+resource within the resource file of the shell application.
+(Hence the `#define` of `R_STRARRAY_APPNAMES` as `78`).
+This resource actually contains an array of strings giving the filenames of the built-in applications, with the filename of Word.app as the second element in the array.
+
+See the chapter _Resource Files_ in the _Additional System Information_ chapter for background on creating and using an instance of the `rscfile` class.
+
+The program also analyses its own command line, and constructs a suitable one to pass on to _Word.app_.
+The detailed working of the program can be followed using the information given earlier in this chapter.
+

@@ -1,0 +1,17 @@
+= The Psion Documentation Project
+
+== Introduction
+
+This repo is the start of a new documentation project for Psion portable computers.
+
+Currently it only includes information from the 16-bit SIBO range, specifically from the SIBO C SDK.
+The eventual aim is to include information about all Psion machines.
+
+It is *VERY EARLY ALPHA*.
+I am still trying to work out the best way to format the documents and arrange the files, so everything is likely to change.
+
+== Why AsciiDoc?
+
+I believe it's better suited to writing technical documentation (or any book, for that matter) than Markdown and its myriad variants.
+For one thing, there is a single standard for tables and it works really well.
+The tooling (AsciiDoctor) is also very flexible and is easily able to generate HTML, PDF and EPUB files.

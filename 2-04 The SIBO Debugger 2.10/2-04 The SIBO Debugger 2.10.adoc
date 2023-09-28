@@ -1,0 +1,837 @@
+= The SIBO Debugger: SIBO C SDK
+:doctype: book
+:toc:
+:toclevels: 4
+:experimental:
+
+Version 2.10
+
+February 3, 1995
+
+*(C) Copyright Psion PLC 1990-95*
+
+All rights reserved.
+This manual and the programs referred to herein are copyrighted works of Psion PLC, London, England.
+Reproduction in whole or in part, including utilization in machines capable of reproduction or retrieval, without express written permission of Psion PLC, is prohibited.
+Reverse engineering is also prohibited.
+
+The information in this document is subject to change without notice.
+
+Psion and the Psion logo are registered trademarks, and Psion, Psion MC, Psion HC, Psion Series 3, Psion Series 3a and Psion Workabout are trademarks of Psion PLC.
+
+TopSpeed is a registered trademark of Clarion Software Corporation.
+IBM, IBM XT and IBM AT are registered trademarks of International Business Machines Corp.
+Microsoft and MS-DOS are registered trademarks of Microsoft Corporation.
+Apple and Macintosh are registered trademarks of Apple Computer Inc.
+VAX and VMS are registered trademarks of Digital Equipment Corporation.
+Brief is a registered trademark of Underware Inc.
+Psion PLC acknowledges that some other names referred to are registered trademarks.
+
+== INTRODUCTION
+
+The Psion SIBO Debugger is tailored to the EPOC operating system environment and enables you to debug applications written for the Psion SIBO family of machines.
+This family currently includes the MC200, MC400, HC and Series 3 ranges.
+
+It is a source level debugger, using the symbol table information produced by the JPI TopSpeed compiler.
+Currently only the C programming language is supported.
+
+The debugger is supplied with a built-in file manager, described in a later chapter of this manual, which provides file, directory and device manipulation.
+
+The debugger runs on a host machine and can be used to debug Psion SIBO applications running on either the local host or, via its remote debugging facility, on a remote SIBO machine.
+The debugger can simultaneously debug up to eight processes -- four on each of the local and remote machines.
+
+To debug a remote application you will need a development PC with a serial port (and, optionally, a Bus mouse).
+For remote debugging the PC should be connected via a serial cable to a remote SIBO machine which may be:
+
+* an MC200 or MC400 (version 2.30 or above)
+* an HC (any version)
+* a Series 3 (version 1.77 or above) with a serial link expansion module.
+* a Series 3a (version 3.20 or above) with a serial link expansion module.
+
+Versions earlier than 2.30 of the MC or 1.77 of the S3 will cause the debugger to terminate.
+
+=== Debugging modes
+
+You may use the debugger in one of three possible ways:
+
+* as a ‘conventional’ debugger
+* to bring a running process under the debugger's control
+* to locate a panic in a running process
+
+The ‘conventional’ use is to load a process from within the debugger, set breakpoints, step, trace and run, as with any other debugger.
+
+The second type of use is of value when debugging a process that can not easily be loaded from the debugger.
+An example would be to debug a replacement shell on the HC, since it will be automatically loaded and run on system start-up.
+This technique is described in the _Process list top-level view_ section of the chapter _Top-Level Views_.
+In order to locate a panic you simply run the debugger and then independently run and exercise the process under test.
+When the process panics it is automatically brought under the debugger’s control.
+The steps needed to locate the application code which gave rise to the panic are described in the _Stack view_ section of the _Process Window_ chapter.
+
+=== SIBO architecture overview
+
+This section gives a brief overview of the relevant aspects of the SIBO programming environment.
+It should be read in conjunction with the _Memory Allocation_ chapter in the _PLIB Reference_ manual.
+
+==== System memory
+
+The EPOC operating system manages all the memory within a machine.
+The sections of memory that the debugger is primarily concerned with are the allocated memory segments -- contiguous regions of memory that contain 'live' information, either code or data.
+
+The EPOC operating system maintains within its data space an allocated memory segment table.
+This table has room for 96 entries, each of which contains:
+
+* a physical 8086 segment register address of the start of the segment
+* an access count
+* a unique segment name
+
+The position of such an entry within the table is known as the segment handle for the relevant allocated memory segment.
+
+Memory segments are dynamic in size; they may grow or shrink depending on the amount of memory actually being used within the segment.
+Although a memory segment that contains code will not, in general, change size, one containing data, particularly an application process data segment, is quite likely to change size.
+The debugger takes account of this and any views on data segments are resized appropriately.
+
+Each memory segment has an access count that indicates how many times the segment has been 'opened'.
+Only when the access count is reduced to zero will the memory segment be freed.
+This mechanism allows code sharing, where multiple processes of the same application share a single segment containing the application code.
+The debugger understands this principle and breakpoints are associated with a particular process, rather than with the code segment itself.
+
+As part of its memory management system, EPOC may move allocated memory segments.
+This ensures that, as memory segments are allocated, freed or changed in size, the pool of free system memory exists as a single contiguous region.
+The physical address of an allocated memory segment may therefore change over time, but the segment handle within the segment table will always remain constant.
+
+The debugger automatically tracks the movement of memory segments.
+It does not display the segment registers or the absolute segment address since these values do not have much meaning; they may change at any time.
+The debugger handles segments symbolically by the name of the segment, but places no significance on the segment name.
+It can not, for example, determine the nature of a segment’s contents from its name.
+
+==== Segment register usage and interrupts
+
+Although memory segments move, the majority of programmers need not concern themselves with this.
+Only machine code programmers who want to manipulate the 8086 segment registers need read the remainder of this section.
+
+Many EPOC system services, including memory segment movement, are performed under interrupt control.
+
+If a segment register is used to point at or within a memory segment the operating system will modify the segment register correctly when memory moves.
+If a segment register is to be modified the programmer should ensure that interrupts are disabled during the modification.
+Interrupts should be enabled as soon as the segment register content has been modified.
+
+Conversely, if a segment register is to be used as a scratch register then interrupts should remain off for the duration of such usage, since the operating system will modify all segment registers when it moves memory.
+
+If an application calls an operating system service that causes the process to wait on a semaphore, the DS and ES segment registers must contain the segment address of the calling process data segment.
+Such services are `p_read`, `p_write`, `p_seek`, `p_close`, `p_iow` and `p_msendreceivew`.
+
+An application should, if possible, avoid disabling interrupts.
+If it is necessary to disable interrupts, they should be disabled for as short a time as possible.
+Leaving interrupts disabled for more than 1 millisecond will, at the very least, cause significant degradation to system performance.
+
+If the application leaves interrupts disabled for more than about one second, a watchdog NMI (non maskable interrupt) will occur and the operating system will terminate the process that has interrupts disabled.
+
+== STARTING UP THE DEBUGGER
+
+=== Preparing a process for debugging
+
+In order for the debugger to provide source level debugging you must build the application in such a way that the appropriate symbol files are generated.
+
+The debugger looks for a `.map` file, a `.sym` file and a number of `.dbd` files.
+A `.dbd` file is created by the JPI compiler during the compilation of a source module and has the same file name as the source module file.
+
+The `.map` file is generated while linking the application and has the same name as the `.img` file.
+It is used, primarily, to obtain symbolic information for library routines.
+
+The `.sym` file is created by the `EMAKE` utility program (provided there is symbolic information to write out) at the same time as it creates the `.img` file.
+It has the same file name as the `.img` file and contains all the information required to load the `.dbd` files.
+
+Each source module linked to produce the `.img` file requires a `.dbd` file to describe its contents for symbolic debugging.
+The debugger does not require a `.dbd` file for every module (or, in fact, for any module) but it will not be able to present source level debugging for any module that does not have a corresponding `.dbd` file.
+
+==== JPI TopSpeed C symbol files
+
+To allow the compiler to generate source level symbolic information (`.dbd` files) the VID debug pragma should be set to either min or full.
+This can be done either within the JPI project system or within the `.pr` files.
+A `.pr` file should, for example, contain the line:
+
+ #pragma debug(vd=>full)
+
+or
+
+ #pragma debug(vid=>min)
+
+There is further information on this topic in the _Building an Application_ chapter of the _General Programming_ manual.
+It should be noted that the JPI compiler generates different code for each level of the VID pragma.
+The more debugging information generated, the more actual executable code is produced.
+This has an unfortunate side effect in that bugs may come and go, depending on the state of the VID pragma.
+
+If a bug disappears when the module is compiled with debug information on then the bug is likely to be concerned with register corruption.
+
+If a bug only appears when the module is compiled with debug information on then the bug is likely to be concerned with stack memory overwrites.
+
+The debugger will check the date of each of the `.dbd` files it attempts to load against that of the image file containing the process to be debugged.
+If the `.dbd` file has a later date it will not be loaded.
+
+The VID debug pragma must also be set to min or full while linking the application in order for the `.sym` file to be created.
+
+The JPI environment shipped with this version of the debugger has the optimise for speed pragma set to off.
+It should always be set to off when building an application that is to be debugged.
+Arguably, since turning this pragma on produces larger (although marginally faster) code, it should always be set to off, since the code size is of great importance for SIBO machines.
+
+==== The debugger and symbol information
+
+The debugger maintains symbol information on a per memory segment basis.
+
+When a process is loaded the operating system typically creates two segments, a code segment and a data segment.
+The debugger knows which segments these are from the process table entry for the loaded process and attempts to load symbol information for each of the newly created segments.
+
+The symbol information for each segment is totally independent of any other information.
+This allows the debugger to perform symbol information sharing if, for example, multiple processes of the same application are being debugged.
+
+A process may execute code in many different segments.
+When process execution stops within a segment the debugger will automatically attempt to load the symbol information for that segment, provided it is not already loaded.
+The debugger uses the segment name to infer the name of the `.sym` file that, in turn, contains the information required to load the `.dbd` files.
+
+The debugger loads the source level symbol information into memory segments on the local machine.
+All memory segments are required to have a unique name.
+The debugger uses segment names beginning with at least a two character sequence of any one of `YC`, `YD`, `ZC`, `ZD` and `ZS` for different parts and types of symbol information.
+A view of the segment table of the local machine will show these segments.
+
+=== Debugger initialisation
+
+On start up the debugger determines the type of screen the PC has, and loads an appropriate screen driver.
+The debugger supports VGA and Hercules screens.
+
+Once initialised, the debugger reads its command line and configuration files and interprets them as follows:
+
+==== Debugger command line
+
+The debugger takes a command line of the following format:
+
+ sdbg [flags] [process name [process command line]]
+
+The optional flags are:
+
+[cols="1,5"]
+|===
+|`-L`
+|to specify local debugging
+
+|`-P__n__`
+|to specify the serial port to use, `__n__` takes the value 1 or 2 for COM1 or COM2
+
+|`-B__n__`
+|to specify the baud rate to run at.
+MC200/400 machines can run at 19200 baud, the HC and Series3 machines at 9600 baud and the Series 3a machine at 19200 baud.
+|===
+
+If no flags are specified the debugger will run a remote debugging session.
+Unless an `mclink.trm` file exists (in which case this file determines the port and baud rate) connection will be via COM1 at 9600 baud.
+
+Once a connection with the remote machine has been established the debugger will automatically load any process whose name is included in the command line.
+
+The process command line, if present, is passed to the loaded process when it is run.
+
+Note that the contents of the debugger command line are converted to upper case.
+If the process name or the process command line need to contain lower case characters you should load the process from within the debugger, rather than by means of the debugger command line.
+
+Examples:
+
+ sdbg -l
+
+starts up the debugger to debug processes on the local machine, without loading any image file.
+
+ sdbg -l print.img
+
+will load the (local) image file `print.img` to run on the local machine.
+
+[code,console]
+----
+sdbg -p2 -b19200 print.ing “This is a remote print”
+----
+
+will load the (local) image file to run on a remote machine that is connected to COM2, running at 19200 baud.
+The command line “THIS IS A REMOTE PRINT” is passed to the loaded process.
+
+----
+sdbg rem::m:\test.img “rem::a:\testfile.doc”
+----
+
+will load the image file `test.img` from the remote machine’s M:\ directory to run on the remote machine, connected to COM1, running at 9600 baud.
+Note that a file path passed in the process command line is interpreted by (and hence relative to) the remote process.
+In the above example the file `TESTFILE.DOC` is expected to be found on drive A of the _local_ machine.
+
+The process command line may contain any mixture of quoted strings and single byte numeric values, separated by commas.
+The required content depends on both the particular process and the SIBO machine on which the process is to run.
+Command line requirements, if any, are described in the appropriate programming guide (see, for example, the _Communicating with the System Screen_ chapter of the _Series 3 Programming Guide_).
+
+==== Configuration files
+
+A debugger configuration file is a text file, with name `sdbg.cfg`.
+Each line starts with a keyword, possibly followed by one or more values.
+An exclamation mark (!) indicates a comment; following text in that line is ignored.
+
+On start-up the debugger will look for and read two configuration files, the first from the directory in which the debugger `sdbg.exe` exists and
+the second from the current directory.
+Typically, the first of these configuration files would contain system-wide keyword definitions and the second would contain application-specific definitions.
+
+The following keywords are recognised:
+
+[cols="1,3"]
+|===
+|`INITIAL_IP`
+|specifies the symbolic address to which a loaded process should run before the debugging cycle starts.
+If the symbolic address cannot be found then the debugging cycle begins with the process start up code.
+If more than one `INITIAL_IP` is defined, then the last definition is taken.
+
+|`SOURCE_PATH`
+|specifies a path, in addition to the current directory, which the debugger will search to find the `.map`, `.dbd`, `.sym` and source files required for source level debugging.
+All paths must be fully specified paths, rather than relative paths.
+The `SOURCE_PATH` definitions are cumulative, with paths being searched in the order in which they are defined.
+Putting the most common path first will speed up searching for symbol and source files.
+
+|`BREAKPOINT`
+|specifies a symbolic address for an initial breakpoint to be applied to a process.
+The definition is ignored if the symbolic address can not be found.
+The `BREAKPOINT` definitions are cumulative.
+
+|`F1` to `F10`
+|specify the assignment of the function keys kbd:[F1] to kbd:[F10] to accelerator key presses.
+If more than one function key is defined, then the last definition is taken.
+
+|`TAB_WIDTH`
+|specifies the number of character spaces a tab character represents in the display of a source file.
+If more than one `TAB_WIDTH` is defined, then the last definition is taken.
+
+|`BEEP_OFF`
+|disables the beep which accompanies a transiently displayed error message.
+
+|`NO_COMMAND_LINE`
+|specifies a null process command line, disabling the prompt for an initial command line when a process is loaded from the Load option in the target view’s Process menu.
+|===
+
+You may specify more than one value in each `BREAKPOINT` or `SOURCE_PATH` command, provided that successive values are separated by commas as in the following example:
+
+....
+SOURCE_PATH = c:\sibosdk\hwdemo\,d:\dirname\
+BREAKPOINT = p_panic,p_notifyerr
+....
+
+Note that spaces are not allowed within such comma-delimited lists.
+
+The debugger is supplied with a default configuration file which is placed in the same directory as `sdbg.exe` by the installation process.
+The following is a commented version of the content of this file.
+
+----
+! Sample configuration file for the Debugger
+
+! Specifies the paths, in addition to the current directory,
+! to search for source, .MAP, .DBD and .SYM files
+! (example lines, commented out)
+! SOURCE PATHc:\sibosdk\hudemo\ I note the terminating '\'
+! SOURCE PATH=d:\dirname\
+
+! Pass zero-length command line to load and run commands
+! (example line, commented out)
+! NO_COMMAND_LINE
+
+! Turns off the beep that normalLy accompanies the temporary
+! display of an error message
+! (example line, commented out)
+! BEEP_OFF
+
+! Specifies the tab stop width used when displaying source code
+TAB_WIDTH=4
+
+! Specifies breakpoints to set up
+BREAKPOINT p_panic
+
+! Specifies where the debugger witt run the process to before it
+! reports the loading of the process is complete.
+INITIAL_IP=main
+
+! Specifies the assignment of accelerators to function keys
+! F1 to F10 may be assigned
+F2=B    ! set a Break point at the current line of code
+F3=X    ! delete the current foreground view
+F4=H    ! run to the highlighted position
+F5=M    ! view a source module
+F6=V    ! view the highlighted variabte
+F7=T    ! trace one instruction
+F8=S    ! step one instruction
+F9=R    ! run
+F10=G   ! go to address
+----
+
+Note that the function key assignment descriptions given above apply only to menu items in the process window view.
+If a different type of view is foreground then the accelerators will, in general, invoke a different set of menu items from the current menu.
+
+==== Remote Debugging
+
+Subject to available memory, you may simultaneously debug up to four processes on a remote machine.
+
+Since the debugger communicates with the remote machine via a channel of the Link process, you must run the Link application on the remote machine before debugging a remote process.
+It is also advisable to disable auto switch-off.
+
+* on a Series 3 set the btn:[Remote link] option in the Special menu of the System application to _On_.
+Select Options in the Special menu of the System application and set Auto switch off to No.
+(It is also advisable to set the Update lists item in Options to System button.)
+* on a Series 3a set the Remote link option in the Special menu of the System application to On.
+Select the Auto switch off item in the *Control* menu of the System application and set Auto switch off to No.
+(It is also advisable to set Update lists in the Set preferences item in the Special menu to System button.)
+* on an HC enter ‘auto -1’ and then run the Link application from the system command line.
+* on an MC200 or MC400 select and run the Link application icon in the System display.
+Select the Auto Switch Off option in the *Options* menu and tick the btn:[Always On] check box.
+
+It is recommended that the remote machine is connected to a mains power supply since communications hardware is quite power-hungry and will drain the batteries quite quickly.
+
+The debugger communicates with the remote machine via a process called `SYS$STUB`.
+If no such process is available on the remote machine, or the version that is available is out of date, the debugger will automatically copy a new version of `sys$stub.img` to the remote machine.
+The copy is made from the directory containing `sdbg.exe` (a `sys$stub.img` is placed there during installation) to the default drive of the Link application process (typically M:\).
+Because of the need to copy this file, the first invocation of the debugger will take longer to start up than subsequent invocations.
+
+Once a connection between the debugger and the `SYSSSTUB` process has been established, all commands are identical to the local debugging configuration.
+
+==== Local debugging
+
+Subject to available memory, you may simultaneously debug up to four processes on the local machine.
+
+Debugging locally is much faster since the communications overhead is greatly reduced compared with remote debugging.
+(Although minimised, the communications overhead is the dominant factor in any of the debugger commands.)
+
+In principle, any process can be debugged locally.
+CLIB programs, whose user interface consists only of console I/O function calls, can be debugged locally quite successfully.
+Bear in mind, however, that the screen size of different target machines varies.
+It is strongly recommended that the application be run on the target machine before being released.
+The default screen size for a CLIB application can be varied by setting the `_DefScreenRect` data structure as appropriate for the target machine.
+
+The user interface libraries and the graphics window servers on the MC200/400, HC, Series 3 and Series 3a differ from each other.
+Applications which use these user interface components thus need to be debugged on the appropriate machine.
+If an application is designed with separate user interface dependent and user interface independent sections, all user interface independent code can be debugged locally.
+
+==== Simultaneous local and remote debugging
+
+Subject to available memory, you may simultaneously debug up to four processes on the local machine, together with up to a further four processes on the remote machine.
+
+This is particularly useful, for example, in order to debug client-server applications that communicate via a Link channel.
+
+If you wish to debug both local and remote processes you may start the debugger for either local or remote debugging, subsequently making a connection to the other machine, as described later.
+You have more direct control over the serial port and baud rate if you start up the debugger for remote debugging.
+
+=== Initial display
+
+A single process list view is created when the debugger is started up.
+This will contain a list of the processes on either the remote or the local machine, depending on whether the debugger was started up for remote or local debugging.
+
+If the debugger command line included the path of an image file then this process will be loaded and run, up to the position specified by the `INITIAL_IP` command in the configuration file.
+If the keyword `NO_COMMAND_LINE` does not appear in either configuration file, and if you did not include a process command line in the debugger command line, you will be prompted for a process command line (just press kbd:[Enter] if you do not need to pass a command line to the process).
+
+A process window is created to display a debugging view of this process.
+It will appear in front of the process list view.
+
+== THE GRAPHICS INTERFACE
+
+This chapter briefly describes the graphics interface used by the debugger and the included file manager.
+
+Apart from a few keypress variants, it is similar to that used on the MC200 and MC400 machines.
+If you are familiar with either of these you will probably not need to make more than an occasional reference to this chapter.
+
+==== Tasks
+
+A running application, or task, is presented within a titled window, with an accompanying command menu bar.
+The debugger itself uses a number of titled windows, many of which may be visible at the same time, to present various aspects of the debugging process.
+
+A task may be controlled by means of either a mouse or keypresses.
+
+If more than one task is running (that is, if you are using both the debugger and the file manager) you are interacting with only one of them at any given time.
+This is the foreground task -- indicated by the highlight in its title bar.
+
+You can switch from one task to another either by clicking on the task (hold down the kbd:[Alt] key, if you do not want the click to be received by the task itself) or by pressing the kbd:[Insert] key to cycle round the tasks.
+
+=== The titled window
+
+A titled window is a rectangular region of the screen, surrounded by a border.
+The title bar, across the top of the window, contains textual information and three controls to change the size, shape and position of the window.
+
+Moving the mouse pointer into any of these three control areas causes the pointer to be replaced by an appropriate icon.
+
+==== Resize
+
+The resize control is at the left-hand end of the title bar.
+Click in this region, or press kbd:[Alt+[], to activate the resize control.
+Resize triangles appear on the corners and sides of the window.
+
+With a mouse, you may drag any of these arrows to change the size of the window, or drag in the central area to change the window’s position.
+
+Pressing one of the four cursor keys moves the window, and holding down the kbd:[Shift] key while pressing a cursor key changes the size of the window (holding down the kbd:[Ctrl] key speeds up these processes).
+
+When the window outline is as you want it, press the kbd:[Enter] key.
+The triangles disappear and the window takes the new shape.
+Or press kbd:[Esc] to cancel the resize.
+
+==== Move
+
+The move control occupies the central region of the title bar.
+Dragging in this region changes the window’s position.
+
+To move the window by means of keypresses, use the window movement keys as described for the resize control.
+
+==== Zoom
+
+The zoom control occupies the right-hand end of the title bar.
+
+Click in this region, or press kbd:[ALT+\]], to switch the window between its current size and its maximum size.
+
+(If these two sizes are the same, the zoom control will have no apparent effect.)
+Repeating the process will reverse the change.
+
+==== Iconising a window
+
+The rectangular control at the left of the command menu bar is the iconising control.
+This control is disabled for the debugger itself, but is available in the file manager.
+
+Click on this control, or press kbd:[Alt+Esc], to shrink the application window to its iconised form.
+This is useful to clear a cluttered screen, without having to exit the application.
+
+Double click on the icon, or bring the icon to the foreground (with the kbd:[Insert] key) and press kbd:[Enter], to restore the application window, ready to resume work.
+
+=== The command menu bar
+
+Command menu bars may contain two kinds of controls, rectangular buttons and angled menus.
+Select one of these by clicking on it, or by holding down the ALT key and pressing one of the number keys along the top row of the keyboard.
+The buttons and menus are numbered from left to right (not counting the iconise control) for example, pressing kbd:[Alt+3] in the debugger’s process list top-level view will select the Process menu.
+
+A button represents a single command option; selecting one has the immediate effect of executing the corresponding command.
+Selecting a menu displays a menu list.
+
+When a menu list is displayed, the kbd:[LEFT] and kbd:[RIGHT] cursor keys will switch to neighbouring menu lists.
+Select an item within the list by clicking on it, or by using the kbd:[UP] and kbd:[DOWN] cursor keys to move the highlight to the required item and pressing kbd:[Enter].
+
+Press kbd:[Esc] to cancel a menu selection or move the mouse pointer away from the menu list and click.
+
+There are 3 kinds of menu item, which behave in different ways when you click on them:
+
+* items which lead to a dialog box, needing or providing further information; these items are indicated by ... after the descriptive text
+* items which cause something to happen immediately, shown as just descriptive text
+* items which are crossed out since they are not available to you at present
+
+==== Accelerators
+
+Many commands have a keyboard short-cut (or accelerator) to select them without first having to display the menu list.
+These accelerators are shown on the right hand side of the menu lists.
+
+In the Debugger the commands that have accelerators may be selected by holding down the kbd:[Alt] key and pressing the letter, or just by pressing the letter.
+For example, the Create File Manager command, which starts up the built-in File Manager, may be selected by pressing kbd:[Alt+F] or, more simply, by pressing kbd:[F].
+Note that, in contrast, the accelerators in the File Manager itself may only be accessed by an kbd:[Alt]+keypress combination.
+
+Remember that some of the debugger accelerator keys may be assigned to the function keys kbd:[F1]-kbd:[F1O] in the configuration file.
+
+==== Dialog boxes
+
+Dialog boxes contain a number of items, or controls, of varying types.
+Click on a control to select it, or press the kbd:[TAB] key to move the highlight onto the next control within the dialog box: press kbd:[Shift+Tab] to move back to the previous one.
+
+==== Buttons
+
+A button is selected by clicking it, or by moving the highlight to it and pressing kbd:[Enter].
+
+Most dialog boxes contain two special exit buttons, labelled btn:[CANCEL] and btn:[ENTER].
+The btn:[ENTER] button, selected by pressing kbd:[Enter], confirms the current set of choices and exits the dialog.
+The btn:[EXIT] button, selected by pressing kbd:[Esc], aborts the dialog, ignoring any changes that may have been made.
+
+==== Pop-out menus
+
+Click on a menu, or move the highlight to it and press the kbd:[SPACEBAR] to display its contents.
+Click on the desired item, or move the highlight with the up and down cursor keys and press kbd:[Enter] to select an item.
+
+==== Tick boxes and diamonds
+
+A tick box offers a Yes/No choice.
+You set a tick to indicate that you want that option.
+
+Diamonds offer a set of choices which are mutually exclusive -- you can choose one and only one.
+
+In either type, click on an item to set or clear it.
+Alternatively, press kbd:[Tab] until the item you want is highlighted.
+Then press the kbd:[SPACEBAR] to tick/untick its box or to shade its diamond.
+
+=== The file selector dialog
+
+The file selector dialog is a good example of a dialog box in that it incorporates most of the elements discussed earlier.
+
+A detailed description of this dialog is included here because it is used in many places in the debugger.
+For example, in the process list top-level view, selecting the File item in the View menu starts a file
+selector dialog.
+
+You use the file selector from within an application whenever you want to save, open or create a file.
+
+There are several ways of selecting a file with this dialog box:
+
+* if you know the name of the file and exactly where it is located, you can type the full file name into the Selected file edit box.
+* use the pointer or keyboard short-cuts to highlight a directory in the left-hand list box and display its contents (file names and directory names) in the right-hand list, then either select a file name from this list, or type a new name into the Selected file edit box.
+* edit the drive, directory and wildcard specification in the Current Directory box (you can use the Extensions pop-out list in just the same way as in the file manager).
+Then press kbd:[TAB] or kbd:[ENTER] to see the contents of the directory you want, then select a file name from the list or type a new one into the *Selected File* edit box.
+* If you don’t specify an extension for your selected file, then the one in the Current Directory box is added automatically.
+If you really don’t want an extension for your file, then type a dot after the name.
+
+Use kbd:[Tab] to move around within the file selector dialog.
+kbd:[Alt+Space] moves to the Current Directory edit box and kbd:[Alt+Down Arrow] selects the Extensions pop-out list.
+The three buttons that change directories are selected as follows:
+
+[cols="1,3"]
+|===
+|kbd:[Alt+Right Arrow]
+|DESCEND
+
+|kbd:[Alt+Left Arrow]
+|ASCEND
+
+|kbd:[Alt+Up Arrow]
+|DEVICES
+|===
+
+These keyboard short-cuts are the same as for the file manager, described in a later chapter.
+
+Selecting ASCEND removes the last directory level from the current directory display box and updates both the left and right hand list boxes.
+
+Selecting DESCEND adds the directory level currently highlighted in the left hand list box to the current directory display box and then updates both the left and right hand list boxes.
+
+Selecting DEVICES displays the top level list of file-system/drives in the left hand list box and displays the contents of the highlighted ‘device’ in the right hand list box.
+
+=== Help
+
+Context sensitive help is supplied when the key combination kbd:[Ctrl+Alt+Tab] is pressed.
+This displays a dialog box titled *HINTS* and contains two list boxes.
+The right hand box displays a list of topics while the left hand box displays help information related to that topic.
+
+To change the topic selected, simply use the kbd:[Up] or kbd:[Down] arrow keys to highlight a different topic.
+The help information in the left hand box changes automatically.
+The same effect can be achieved using a mouse by simply clicking on the desired topic.
+
+Typically, help information includes various key press combinations and resulting actions.
+
+The dialog can be terminated by pressing kbd:[ENTER] or kbd:[ESC] or, if using the mouse, by clicking on the btn:[EXIT] button.
+
+== Top Level Views
+
+The debugger presents the user with a number of independent windows, each with its own menu bar.
+These are known as top-level views and provide views of a range of aspects of a target machine.
+
+The following types of top-level view are available:
+
+[cols="1h,3"]
+|===
+|Process list
+|a list of all processes running on a machine
+
+|File
+|a view of a particular file (assumed to be text)
+
+|Segments
+|a list of all existing segments on a machine
+
+|Devices
+|a list of all existing devices on a machine
+
+|Environment variables
+|a list of all environment variables on a machine
+
+|Process window
+|the main debugging view of a single process
+|===
+
+Each of these, with the exception of the process window, is described more fully in the following sections.
+The process window is described in a separate chapter.
+
+You may bring a particular top-level view and its corresponding menu bar to the front by clicking on it with a mouse.
+Alternatively you can press kbd:[Ctrl+Tab] or use the btn:[Next] top-level view option, with accelerator kbd:[Alt+N] (and which, depending upon the front top-level view, is in either the Debugger menu or the Process menu) to cycle through the views.
+
+Various commands have the effect of creating a new top-level view or bringing one of the top-level views to the front.
+
+In addition to commands whose action is specific to a particular top-level view, many commands are, for convenience, replicated in the menu bars of several views.
+To avoid undue duplication, these common commands are described once, in the documentation of the first view in which they appear.
+
+If shown, the function key assignment for a command is that made in the default configuration file, described in an earlier chapter of this manual.
+
+=== Process list top-level view
+
+You may have up to two process list views, one for the local machine and one for any connected remote machine.
+The title bar of the view informs the user of the machine to which it relates.
+
+A process list view presents the user with a list of processes on either the local or the remote machine.
+The list is a snapshot of the relevant machine at the time the list is built.
+The list can be updated at any time by selecting menu:View[Regenerate list].
+
+A process can be selected from the list by moving the highlight.
+Various operations can be performed on the selected process.
+
+==== The current target
+
+The machine on which a process that is being debugged is running is known as the target machine.
+There are therefore two target machines when the user is simultaneously debugging processes on both the local and remote machines.
+
+At any one time the user is interacting with one particular process.
+The machine on which this process is running is known as the current target.
+
+When many top-level views exist, it may not always be obvious which machine is the current target.
+Since all top-level views are derived (that is, created either directly or indirectly) from a process list view, the process list view from which the current front window is derived always defines the current target.
+
+For example, if the current top-level view is a file view it could be displaying a file from either machine.
+If, however, it was created from the remote file list view, then the current target is the remote machine.
+
+Selecting menu:View[Process] will always bring the process list view of the current target to the front.
+
+== Debugger menu
+
+==== Next top-level View | kbd:[Alt+N], kbd:[N], or kbd:[Ctrl+Tab]
+
+Cycle to the next top-level view.
+
+==== Version
+
+Display a copyright message, the debugger version number and the amount of free memory.
+
+==== Create File Manager | kbd:[Alt+F] or kbd:[F]
+
+Create and run an independent file manager application.
+This enables you to copy, delete or otherwise manipulate files without having to exit the debugger.
+It is particularly useful for copying files between the local and remote machines.
+
+==== Run Image | kbd:[Alt+K] or kbd:[K]
+
+Present a file selector to select and run an image file.
+The resulting process runs on the current target machine.
+For more detail on the dialog, see the section on the file selector dialog in _The Graphics Interface_ chapter.
+
+==== Exit | kbd:[Alt+E] or kbd:[E]
+
+Exit the debugger after requesting confirmation.
+
+== Local/Remote CPU Menu
+
+==== Connect to Remote/Local
+
+Connect to either the remote or the local machine, depending on whether the current target is either the
+local or remote machine respectively.
+
+If the connection does not previously exist and is successfully made, an appropriate process list view is
+created and brought to the front, setting the current target.
+
+If the connection currently exists, the appropriate process list view is simply brought to the front, setting
+the current target.
+
+==== Information
+
+Display the machine type and version information about the software components of the current target.
+
+The software built into the ROM of a SIBO machine consists of the EPOC operating system, together with a number of independently built sections of code, many of which exist as separate processes.
+The version of the software in a particular machine is characterised by the version number of the operating
+system and of the ROM as a whole.
+
+== Process menu
+
+==== Load | kbd:[AIt+L] or kbd:[L]
+
+Present a file selector to select an image file to load and run as a process on the current target, under
+control of the debugger.
+
+You are prompted for a process command line, unless the `NO_COMMAND_LINE` keyword appears in either
+configuration file.
+The process command line content is as discussed in the earlier description of the debugger command line.
+
+The debugger checks the configuration files for any `BREAKPOINT` keywords.
+For each one found it attempts to evaluate the symbolic address and, if successful, adds that address to the breakpoint table held for the process.
+
+Execution halts at a temporary breakpoint placed at the address specified by any `INITIAL_IP` in a configuration file.
+If no `INITIAL_IP` is specified, or if the specified address cannot be evaluated, no process code is executed and execution halts with the instruction pointer positioned at the process entry point.
+
+Once execution has halted the debugger creates a process window.
+It determines the initial display mode by checking to see if source code information is available for the code at the current instruction pointer address (looking in the current directory and in any paths specified in the configuration files).
+
+If source code information is available the process window is set up to contain a single code view, showing source code at the current instruction pointer.
+Otherwise the process window is tiled with an assembly language code view, a registers view, a stack view and a data view.
+
+The debugger will automatically download a process to the remote machine if the selected image file is
+on the local machine and the current target is the remote machine.
+This can take a significant length of time.
+Copying the file to the remote machine, for example by using the built-in file manager, will speed up the process, but has the disadvantage that the file must be recopied each time it is changed.
+
+If the process takes a significant length of time to reach the `INITIAL_IP` address, the debugger will present a special top-level view allowing the user to un-load the process, re-load the process, exit the debugging session or set other breakpoints in the process.
+Early versions of the operating system do not permit the setting of other breakpoints in this situation, lithe version of the operating system on the target machine does not support this option then the debugger will report an error.
+
+==== Break into | kbd:[Aly-B], kbd:[B] or kbd:[F2]
+
+This command brings a running process under the control of the debugger.
+This is done by allowing the user to set breakpoints in a process at a point that the process will hit in the future, probably in response to some user input.
+
+Select a debuggable (for example, not in the ROM -- the debugger cannot set breakpoints in hardware!) running process in the process list menu and select the Break into option.
+This brings up a special version of a process window with a modified command menu, displaying the code of the selected process.
+Note that, at this stage, the process is still running.
+
+Select one or more breakpoint addresses, of which at least one should be at a point in the code that the
+process will hit at some future time.
+These breakpoints are stored but have not, as yet, been applied to the code.
+
+Use the _Apply breakpoints_ option in the _Process_ menu to apply the breakpoints to the code.
+When the process hits one of these breakpoints it is brought under control of the debugger and the process window reverts to its normal menu.
+
+This mechanism allows multi-process applications to be debugged without any special code being required in the process that launches other processes.
+
+As a typical example, a parent process is debugged to the point where it calls `p_execc` to load another process.
+If this is successful, regenerate the process list so that it includes the loaded process.
+This process will be in the suspended state, awaiting the parent process to resume it by calling `p_presume`.
+Before allowing the parent to call `p_presume`, select the loaded process from the process list and use the Break into option.
+Since execution of the loaded process has not yet started, main is a suitable position at which to apply a breakpoint.
+
+==== Status | kbd:[Alt+T], kbd:[T] or kbd:[F7]
+
+Display status information about the process highlighted in the process list.
+
+==== Check data segment | kbd:[Alt+U] or kbd:[U]
+
+Perform an integrity check on the heap space of the process highlighted in the process list.
+A dialog shows the result of this check, together with information about stack usage by the process and segment size.
+
+=== View menu
+
+==== Process list | kbd:[Alt+P] or kbd:[P]
+Bring the process list view for the current target to the front.
+If a process list is already highlighted, then selecting this menu item does nothing.
+
+==== File | kbd:[AIt+J] or kbd:[J]
+
+Present a file selector dialog to choose a source file to display in a file view.
+For more detail on this dialog, see _The Graphics Interface_.
+
+==== Segments | kbd:[Alt+S], kbd:[S] or kbs:[F8]
+
+Create and display a segment view for the current target.
+
+If the segment view exists it is simply brought to the front.
+
+==== Devices | kbd:[Alt+V], kbd:[V] or kbd:[F6]
+
+Create and display a devices view for the current target.
+
+If the devices view exists it is simply brought to the front.
+
+==== Environment variables
+
+Create and display an environment variable view for the current target.
+
+If the environment variable view exists it is simply brought to the front.
+
+==== Regenerate list | kbd:[Alt+R], kbd:[R] or kbd:[F9]
+
+Regenerate the list of processes in the process list view of the current target.
+
+== File top-level view
+You may have up to two file views, one for the local machine and one for any connected remote machine.
+The title bar of the view informs the user of the machine to which it relates.
+
+A file view presents the user with a view of a source file.
+
+This top-level view is created by selecting the file item in the view menu of a process list top-level view as discussed earlier.
+
+=== View menu
+
+==== Deiete | kbd:[Alt+X], kbd:[X] or kbd:[F3]
+
+Delete the front top-level view.
+

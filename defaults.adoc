@@ -1,0 +1,8 @@
+:source-highlighter: rouge
+:doctype: book
+:toc:
+:toclevels: 3
+:sectnums:
+:sectnumlevels: 2
+:chapter-signifier: CHAPTER
+:experimental:

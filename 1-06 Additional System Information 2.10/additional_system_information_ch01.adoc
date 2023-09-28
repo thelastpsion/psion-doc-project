@@ -1,0 +1,116 @@
+== MCLINK, MCPRINT AND SLINK
+
+The directory `sibosdk\sys` contains (amongst others) the following programs, all of which can be run on a PC connected to a SIBO computer:
+
+* `mclink.exe` -- a program allowing file transfer and remote file access between the PC and the SIBO computer
+* `slink.exe` -- a “no frills” server-only version of `mclink.exe`, which may run on PCs or PC lookalikes that cannot run `mclink`
+* `mcprint.exe` -- a program for printing “through" a PC to an attached printer.
+
+Basic information on connecting a PC with either an MC computer, a Series 3 computer (see note below), or an HC computer, is given in, respectively, the _MC Operating Manual_, the _Series 3 User Guide_ (see note below), and the _Introduction_ chapter of the _HC Programming Guide_ (part of this SDK).
+The information in this chapter gives some more advanced details on the above three programs.
+
+NOTE: Throughout this chapter a reference to the Series 3 machine is taken to include both the Series 3 and Series 3a machines unless explicitly stated otherwise.
+
+=== Mclink.exe
+
+`MCLINK` requires MS-DOS version 3.2 or above.
+`MCLINK` is unlikely to run inside “DOS emulations” provided by other operating systems (though it happily runs inside MS-DOS tasks inside Microsoft Windows).
+
+If you experience any problems running `MCLINK` on your PC, you should experiment with reduced contents of `autoexec.bat` and `config.sys` files.
+Serial mouse cards may be particularly prone to interfere with the operation of `MCLINK`.
+
+If all else fails, you may wish to use the alternative `SLINK` program, also supplied on the PC `MCLINK` disks.
+
+Note that, by default the HC and Series 3 run at 9600 Baud, the MC and Series 3a at 19200 Baud.
+When a PC running `MCLINK` is connected to an MC, either the PC or MC end will in general have to be changed to enable a link to be established.
+
+==== Commands provided in MCLINK
+
+When you start up the `MCLINK` program, the lower window contains as prompt.
+At this prompt you can enter various commands.
+These commands cover:
+
+* file-handling
+* changing the communications settings
+* exiting the `MCLINK` program
+* displaying the version of `MCLINK`
+* running programs on the remote computer.
+
+or all these commands:
+
+* the command can be abbreviated, to a minimum of the first two letters, eg `DE` for DELETE, `RE` for RENAME, `CO` for copy, and `SE` for SET
+* kbd:[Ctrl+C] stops the command (though in multiple file operations, some files may already have been copied, deleted etc, before the command is stopped).
+
+==== MCLINK and single floppy disk drive PCs
+
+If your PC has only one floppy disk drive (currently referenced as “`A:`”), and you mistakenly enter `DIR B:` while in the `MCLINK` program, the program will be halted by MS-DOS, requesting you to insert a disk into B:.
+
+To avoid this, use the MS-DOS `ASSIGN` command before running the MCLINK program, like this:
+
+[code,batch]
+----
+ASSIGN B=A
+----
+
+Then `DIR B:` will be read as `DIR A:` and the program will not be halted.
+See your MS-DOS manual for further details of the `ASSIGN` command.
+
+==== Exiting the MCLINK program
+
+Type `EXIT` to return to MS-DOS.
+
+==== Display the version of MCLINK
+
+Type `VER` to display the version number.
+
+=== MCLINK file-handling commands
+
+For file transfer operations between a PC and a SIBO computer, you would normally use the File Manager on the MC or various file options on the Series 3.
+For certain purposes, however, you might choose to use the file-handling commands within MCLINK on the PC instead.
+
+==== Rules on filenames
+
+In order to make full use of the file-handling commands of `MCLINK`, various rules about filenames need to be appreciated.
+
+In MCLINK the syntax of full filenames on the PC, MC, MC or Series 3 is:
+
+[code,]
+----
+filing system::device:\directory\sub-directory\file.extension
+----
+
+This is very similar to MS-DOS, except for the `<filing system>` prefix.
+
+If you do not specify a filing system in a file specification, `LOC::` is presupposed.
+
+In MCLINK on the PC, `<filing system>` is
+
+* `LOC::` for files on the PC (local)
+* `REM::` for files on the MC, MC, Series 3 or Series 3a (remote).
+
+On the MC, MC or Series 3 the situation is reversed, with `LOC::` for files on the MC, HC, Series 3 or Series 3a, and `REM::` for files on the PC.
+
+Note that for all `MCLINK` file management commands:
+
+* if no directory is specified, the current directory is assumed
+* if no device is specified, the current device is assumed
+* if no filing system is specified, the PC is assumed.
+
+When specifying a directory or sub-directory in the file-handling commands, make sure to add a `\` onto the end of the directory name.
+Otherwise the directory name will be taken as a filename.
+So:
+
+[code,batch]
+----
+COPY A:\*.* REM::\LETTERS
+----
+
+is wrong -- it would try to copy the files in the root directory of `A:` to the file `LETTERS`.
+
+[code,batch]
+----
+COPY A:\*.* REM::\LETTERS\
+----
+
+is right -- it would copy the files on `A:` to the directory `LETTERS`
+

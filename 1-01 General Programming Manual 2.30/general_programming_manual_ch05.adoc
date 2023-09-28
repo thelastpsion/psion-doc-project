@@ -1,0 +1,935 @@
+
+== FUNDAMENTAL PROGRAMMING GUIDE-LINES
+
+=== Introduction
+
+In some ways, this chapter may be viewed as being among the most important in the whole of the SDK.
+
+Follow the Guide-lines here and your programs have a good chance of possessing the following qualities:
+
+* _user responsiveness_: users will not be kept waiting impatiently if they want to interact with an application whilst it is busy -- eg to cancel some operation part-way completed
+* _error robustness_: data will not suddenly be lost when run-time errors occur such as shortage of system memory (bear in mind that such errors are almost inevitable on a multi-tasking computer, when the system memory can become unexpectedly used up by other applications)
+* _architectural robustness_: changes in user requirements or in implementation tactics should not lead to the whole code becoming unmaintainable.
+
+Of course, practice of _standard_ general programming principles -- such as modular programming, data hiding, egoless programming, designing prior to coding (not to mention adequate requirements specification prior to design), and a structured approach to validation and testing -- all have important roles to play in the production of quality SIBO
+applications.
+But there are _additional_ programming principles that have particular importance within the SIBO environment, and it is these that this chapter addresses.
+These principles should complement the ones good programmers from other backgrounds already practice.
+
+Incidentally, just as the merits of the above-mentioned "standard" programming principles are not always immediately obvious (data hiding is a good example), but rather have to be learned, so it is with some of the principles outlined in this chapter.
+Their importance has become clear to the programming team at Psion only gradually, over several years’ experience.
+It is understandable that experienced programmers from other backgrounds may wish to rush over this chapter, believing its contents to be inapplicable to them, but that would almost certainly be a mistake.
+
+Again, there is of course no substitute for a wide-ranging knowledge of which library functions are available.
+Developers wishing to produce quality applications will naturally have to spend some considerable time familiarising themselves with the contents of the reference manuals within the SDK, so as to be able to spot the right function to use in any particular coding situation.
+This knowledge cannot be acquired simply by assenting to the set of programming principles covered in this chapter.
+But conversely, wide knowledge of the set of available function calls is insufficient, by itself, to produce programs with the traits listed at the start of this chapter.
+
+==== Other related documentation
+
+Applications which are _multi-lingual_ (eg which present English language messages on an English language computer, French language messages on a French language computer, and so on) pose their own set of programming problems.
+These are discussed in the course of the _Resource Files_ chapter of the _Additional System Information_ manual.
+(Resource files are a tool of particular importance for multi-lingual applications.)
+Note that these problems are shared between applications which are _actually_ multi-lingual and those that are _potentially_ multi-lingual: it is better to design support for multi-linguality in from the start, than trying to add it on afterwards.
+
+Graphics programming has its own particular set of do’s and dont’s, in order that (for example) flicker- free redrawing and automated screen update take place.
+These are discussed at various places in the SDK, for example, in the _Window Server Reference_ manual, and also in the _Programming in HWIF_ manual.
+
+Avoidance of excessive RAM usage, and also of "stack windup", are also of considerable importance within the SIBO architecture.
+Specific advice on these regards are scattered throughout the SDK; the present brief note simply has the purpose of drawing attention to the topic.
+
+Finally, the task of _designing the user interface_ (menus, dialogs, and so on) is another that poses its own special problems -- programmers who labour under the misapprehension that user interfaces are "easy" to design almost invariably produce poor user interfaces.
+Guide-lines on these matters may be found within the object oriented documentation parts of the SDK.
+
+==== The source code for the examples
+
+The bulk of this chapter consists of a lengthy analysis of a suite of example programs.
+These build in four stages -- _Events_, _Events2_, _Events3_, and _Events4_ -- to a program that can simultaneously process:
+
+* keyboard input
+* the expiry of a timer
+* reports of the completion of a sub-process
+* data received from a serial port
+
+whilst all the time carrying on some compute-bound activity "in background."
+
+At any given moment, the program cannot predict which of its five possible "event sources" will be the next to require CPU.
+As such, the program amply demonstrates the three vital themes of _multi-threadedness_, _asynchronous i/o_, and _yielding CPU_:
+
+* _multi-threadedness_ means that more than one set of activity takes place simultaneously within the program, with each different flow of activity being handled by its own "thread" of code
+* _asynchronous i/o_ means that the queuing of a read request (or write request) on an i/o channel is separated in code from the completion of that request
+* _yielding CPU_ means that lengthy calculations are broken down into subcomponents that are executed separately, with gaps in between so that some more urgent event source can be attended to, if necessary.
+
+Although the program itself has limited practical use, it demonstrates the basic architectural principles that all sophisticated Epoc programs are bound to have to consider.
+
+The source code for these four stages of Events can be installed from disc (`SIBOSDK\DEMO`), together with that of an associated "sub-process" application, `Subproc`.
+Readers are urged to take the time to build these applications and to experiment with them, in particular trying out some of the suggestions made in this chapter for how these programs could be modified.
+
+==== User interface
+
+The user interface of these example programs has deliberately been kept spartan.
+All screen drawing is to a "console terminal" that is 25 characters wide and 9 characters deep.
+
+These decisions have the advantage that:
+
+* the program works equally well on all different SIBO computers (even on the HC, where the screen is smallest)
+* considerations about interfacing with the Window Server -- necessary in order to achieve more graphically appealing displays -- can be postponed while focusing instead on multi-threadedness, asynchronous i/o, and yielding CPU.
+
+Various examples of Window Server programs demonstrating multi-threadedness (et al) can be found within the SDK.
+For example, the _Writing Software for the HC_ chapter of the _HC Programming Guide_ discusses an application called _Gauge_, that will in fact run happily (with only minor adjustments) on a Series 3.
+Again, the _Programming in HWIF_ manual contains a large set of example programs, all of which interface with the Window Server.
+
+=== A first look at multiple event sources
+
+The main routine in Events is as follows (the individual calls made, including the PLIB calls, are discussed below):
+
+[source,c]
+----
+GLDEF_C VOID main(VOID)
+    {
+    OpenConsole();
+    DrawBorder();
+    OpenTimer();
+    timint=10;
+    QueueTimer();
+    QueueKey();
+    FOREVER
+        {
+        p_iowait();
+        if (keystat!=E_FILE_PENDING)
+            {
+            if (key.keycode==W_KEY_ESCAPE)
+                p_exit(0);
+            if (key.keycode>='1' && key.keycode<='9')
+                SetTimInt(2*(key.keycode-'0'));
+            QueueKey();
+            }
+        else if (timstat!=E_FILE_PENDING)
+            {
+            if (counter++==MAX_COUNT)
+                counter=1;
+                DisplayCount();
+                QueueTimer();
+            }
+        }
+    }
+----
+
+Schematically, the code is as follows:
+
+[source,c]
+----
+GLDEF_C VOID main(VOID)
+    {
+    INITIALISE();
+    QueueTimer();
+    QueueKey();
+    FOREVER
+        {
+        p_iowait();
+        if (keystat!=E_FILE_PENDING)
+            {
+            PROCESS_KEY();
+            QueueKey();
+            }
+        else if (timstat!=E_FILE_PENDING)
+            {
+            PROCESS_TIMER();
+            QueueTimer();
+            }
+        }
+    }
+----
+
+in which it is clear that the program has two event sources -- keypresses and the expiry of a timer.
+What the program actually does is to update a numeric count (displayed on the screen) regularly, on a timer.
+The rate at which the timer fires is determined by which keys the user presses:
+
+* it starts off firing once every second
+* if the user presses the 2 key, the timer changes to firing once every 2/5 of a second (so that the numbers tick over more rapidly)
+* if the user presses the 9 key, the timer changes to firing once every 9/5 of a second (so that the numbers tick over more slowly)
+
+and so on.
+Further, every time a numeric key is pressed, the existing timer request is cancelled, and the timer reset -- so that pressing repeatedly on keys such as 8 and 9 can have the effect of "stalling" the counter altogether.
+
+The program exits in response to the ESC key being pressed.
+All other keys are ignored.
+
+==== Remarks on timers
+
+One simple approach to programming with delays is to call a function
+such as `p_sleep`, which effectively suspends the application for a
+specified amount of time.
+
+This approach could be adopted in Events, were it not for the fact that, when the application is suspended, it cannot respond to a keypress.
+The keypress will only be received when the application "wakens up" again.
+
+Now this might not be too much of a loss for very small time delays, but it is of course unacceptable for longer delays.
+For example, a program might wish to perform some housekeeping or maintenance once every twenty four hours -- or simply update the display in a dialog once every two seconds, whilst allowing the user to cancel out of the dialog at any
+time.
+That is, whilst routines such as `p_sleep` certainly have a role to play, they cannot handle _all_ timer requirements in programs.
+
+A next possible approach would be to design a routine which, when called, suspended the application until the specified time elapsed or a keypress is received -- whichever happens first.
+Indeed, there is a call with just this specification in the OPL programming language (`pause` when used with a _negative_ time delay).
+
+Actually, this routine would satisfy the requirements of _Events_ perfectly.
+However, it has the severe drawback of _lack of architectural openness_.
+That is, suppose the application has to be modified at a later date, to be able to respond to another sort of event source -- eg the arrival of data at a serial port, or an interprocess message from another application.
+Alternatively, the application may need to carry on some continuous activity, whilst waiting for the timer to expire.
+In either case, a more general approach is required.
+
+This more general approach is the mechanism by which the _queuing_ of a timer is separated, in code, from the _completion_ of the timer.
+In the above code, the timer is queued by the call `QueueTimer`, whereas the completion of the timer occurs within the `p_iowait` call.
+(See later for the details.)
+
+This kind of code separation between the queuing of a request and the completion of the request is known as _asynchronous_ -- because there is no automatic synchronisation of the two phases (as occurs, for example, in a call such as `p_sleep`).
+
+==== Remarks on keypresses
+
+A routine such as p_getch is to keypresses what `p_sleep` is to timers -- in both cases, the program is effectively suspended until the request is completely satisfied.
+
+Just as there is a place for `p_sleep` in programming, so also there is a place for `p_getch`.
+However, each is generally inappropriate when there is more than one event source current -- as here.
+
+So the call `p_getch` is split into two parts: the _request_ for a keypress to be delivered, inside the call `QueueKey`, and the delivery of the keypress -- inside `p_iowait`.
+
+==== More on `p_iowait`
+
+The call `p_iowait` is where the application gets suspended, while it waits for the completion of some or other event.
+But whilst `p_sleep` only returns when the associated timer expires, and `p_getch` only returns when a keypress is delivered, `p_iowait` returns when any known event has completed.
+
+Of course, sometimes the application won’t get suspended at all when it calls `p_iowait` -- on account of a queued request already having completed.
+For example, during the time _Events_ is inside the code `PROCESS_TIMER`, the user may have pressed a key, in which case the subsequent call to `p_iowait` will return immediately (not that the application needs to worry about this, however).
+
+The way `p_iowait` works is by consulting the value of the _i/o semaphore_ for the process.
+Each process has an i/o semaphore assigned to it.
+These semaphores are maintained in the private data space of the operating system.
+
+An i/o semaphore commonly has its value changed in either of two ways:
+
+* it is _decremented_ whenever a call to `p_iowait` is made
+* it is _incremented_ whenever some piece of software "signals" the application.
+
+For example, whenever a timer expires, the operating system timer device signals the application which owns the timer.
+Again, whenever the Window Server delivers a keypress to an application, it signals that application.
+In general, the completion of any i/o request always involves the application being signalled.
+
+The i/o semaphore of an application initially has the value zero.
+A call to `p_iowait` only returns when the i/o semaphore is non-negative.
+Given that the call to `p_iowait` starts by decrementing the semaphore, the call will return only when "something has happened".
+
+For more details about `p_iowait` and i/o semaphores in general, see the _PLIB Reference_ manual.
+
+Note that the SIBO Debugger has a menu command (Process Status) which displays the value of the i/o semaphore of a process (amongst other information).
+The Spy application discussed in the _Series 3 Programming Guide_ has a similar feature, which allows the i/o semaphores of all different running processes to be viewed simultaneously.
+
+==== Status words: the other side of `p_iowait`
+
+When a program returns from a call to `p_sleep`, it knows that it is a timer that has expired.
+Likewise, when a program returns from a call to `p_getch`, it knows that a keypress has been delivered.
+However, when a call to `p_iowait` returns, no such information is immediately available.
+All the application knows at this point is that _some_ event has completed -- not _which_ event.
+
+In general, the task of determining which events are indeed ready to be processed involves two factors:
+
+* knowing which event sources are _active_ -- having had requests made on them
+* knowing which of this subset have completed their requests.
+
+For the moment, the first of these points can be ignored (but see later), with attention given to the notion of the _status word_ of an asynchronous request:
+
+* when the request is made, an address of a status word is specified (recall that a "word" is two adjacent bytes)
+* when the request is made, the value `E_FILE_PENDING` gets written to this word
+* when the request completes, a value other than `E_FILE_PENDING` is written to this word (the actual value varying depending on the type of asynchronous request)
+
+Writing to the status word takes place just before the i/o semaphore for the application is signalled.
+Both these steps are integral to the SIBO mechanism of `p_iowait`.
+
+All this explains the code in Events immediately after the call to `p_iowait`: the different status words are _polled_ in turn, in order to find one whose value is no longer `E_FILE_PENDING`.
+
+==== Prioritisation of event sources
+
+Note that the order in which the status words are polled implicitly _prioritises_ the different event sources.
+For it is possible for more than one asynchronous event to have completed; in this case, the first one of the two polled will be the one which gets the first response.
+
+Note in particular that the order in which events are processed need bear no direct relation to the order in which the events actually completed.
+An event source lower down the priority listing can be "locked out" by rapidly firing event sources higher in the listing.
+In fact, code can often be written which _depends_ on this prioritisation -- so that a lower priority event source is only serviced when all higher priority event sources have quietened down.
+
+==== I/O devices in general
+
+In this example, keypresses are delivered by the console device.
+Likewise, timer expiry is handled by the _timer device_.
+The console device and the timer device are both instances of general so-called i/o devices, all of which possess a common interface:
+
+* before using an i/o device, an application has to _open a channel_ to it
+* once opened, various services can be requested via the channel
+* these services can all in principle be requested either _synchronously_ or _asynchronously_
+* if an i/o device channel is no longer needed, the resources it consumes (eg memory) can be released by _closing_ the channel.
+
+Channels to i/o devices are opened by means of the `p_open` call, in which the i/o device has to be specified by name.
+Another parameter to the `p_open` call also defines where the _handle_ of the channel will be written.
+
+The handle returned by `p_open` can then be used to request other services from the i/o device.
+It can also be passed as a parameter to `p_close`, to close the channel down again.
+
+The way _synchronous_ requests are made, via an i/o channel, is to use a `p_iow` call (or a convenience routine that layers over this).
+_Asynchronous_ requests are made using a `p_ioa` (or `p_ioc`) call.
+
+For example, the call to position the console cursor, inside the routine `Write` in `events.c`, is as follows:
+
+[source,c]
+----
+P_POINT pos;
+WORD func;
+pos.x=x;
+pos.y=y;
+func=P_SCR_POSA;
+p_iow4(conH,P_FSET,&func,&pos);
+----
+
+This is a synchronous call because there is no point in calling it asynchronously: the effect of this call (setting the cursor position) is always (virtually) immediate: there is no scope for any extended delay as it is carried out.
+
+On the other hand, the code for QueueKey is
+
+[source,c]
+----
+LOCAL_C VOID QueueKey(VOID)
+    {
+    p_ioa4(conH,P_FREAD,&keystat,&key);
+    }
+----
+
+which is clearly asynchronous.
+(The `a` in `p_ioa` stands for asynchronous.)
+
+By chance, it turns out that these two calls to `p_ioa` and `p_iow` have the same number of parameters.
+This, however, is only the case because the `P_FREAD` request requires one less parameter than the `P_FSET` request.
+In general, an asynchronous request always has one more parameter than the corresponding synchronous request -- namely the status word, whose address has to be passed in the asynchronous case.
+
+For more on the `p_io?` functions (including the significance of the numeric suffices to the function names), see the _PLIB Reference_ manual.
+
+==== The console device
+
+The Events application uses the console device -- as opposed to just making calls like `p_printf` -- for _two_ reasons:
+
+* as discussed already, the console device supports an asynchronous version of `p_getch`
+* the console device supports repositioning of the cursor position -- which fact is relied upon heavily in the application.
+
+For a full specification of the console device, see the corresponding chapter in the _I/O Devices Reference_ manual.
+
+==== How to cancel a timer
+
+The code inside CancelTimer merits some attention:
+
+[source,c]
+----
+LOCAL_C VOID CancelTimer(VOID)
+    {
+    p_iow2(timH,P_FCANCEL);
+    p_waitstat(&timstat);
+    }
+----
+
+First, the `P_FCANCEL` service is requested.
+This is itself a synchronous request, completing at once.
+However, the way the generic service `P_FCANCEL` works in device drivers is never to retract the earlier request, but rather to precipitate its completion.
+It cannot retract it in general because it may already have completed by the time the `P_FCANCEL` request is made:
+
+* if the request has already completed, the `P_FCANCEL` does precisely nothing
+* if the request is still outstanding, it is completed forthwith, with the value `E_FILE_CANCEL` being written to the status word, and with the application being signalled (on account of the fact that the earlier request has now completed, albeit precipitously).
+
+In either case, the application will be signalled -- either before the `P_FCANCEL`, or after it.
+Accordingly, this signal has to be "processed" (or "used up").
+This is the purpose of the subsequent call to `p_waitstat`.
+For more details about `p_waitstat`, see the _PLIB Reference_ manual.
+
+Omitting to call `p_waitstat` after making a `P_FCANCEL` request is a common error.
+The result of this error is that the next call to `p_iowait` will return at once, even though none of the remaining active event sources is ready to deliver an event.
+
+For more details about the timer device in general, see the chapter _Time, Timers and Dates_ in the _PLIB Reference_ manual.
+
+==== Where to declare status words
+
+On the subject of common programming errors in conjunction with asynchronous i/o, perhaps the most common one has yet to be mentioned.
+This is the mistake of declaring status words on the stack of some routine which will have returned long before the asynchronous request completes.
+The status word will now be a piece of random data -- perhaps on the stack of another routine -- and random damage can ensue when it is in due course written to.
+
+Status words should always be declared either in static data (as in _Events_), or in a control block allocated from the heap.
+
+=== A first look at error handling
+
+Every time a function call is written into a SIBO program, the programmer should consider the question: could a run-time error occur in the middle of this function?
+And if so, what would happen?
+
+Chief amongst these possible errors is lack of memory.
+This can occur in _three_ different ways:
+
+* the application has reached the limit of its 64k data segment
+* the application is using less than 64k itself, but there is no system memory available for it to be given more heap space
+* another program with which the application is cooperating runs out of memory.
+
+Other errors that need to be considered include:
+
+* resources not being available because another application is already using them (eg serial port or sound device driver, or even a file that is currently open by another application)
+* disk-based errors such as disk full, disk corrupt, or disk removed
+* the unexpected disappearance of the remote filing system (`REM::`)
+* comms failures such as serial overrun, parity error, or line failure.
+
+These errors cannot be dismissed with the philosophy that, in an ideal world, they will not happen.
+Instead, they can and will happen, despite the best endeavours of the programmer.
+SSDs becoming full up, comms cables being removed, or a file already being open by another program, are all problems that arise naturally in the operation of a SIBO computer.
+
+Whatever the cause of a run-time error, applications should take every care that no data entered by the user is lost.
+Another requirement -- to avoid parts of memory being permanently tied up for no purpose -- is that partly assembled data constructs which cannot be completely assembled, owing to a run-time error at a later stage, should be carefully disassembled again.
+
+==== Error handling in Events
+
+Looking at the source code in `events.c`, it is clear that three different types of error are considered:
+
+* failure to open the timer device
+* failure to open the console device
+* failure to set the size of the console screen.
+
+None of the other function calls have any possibility of run-time error, as can be verified by considering them all individually.
+(In fact, considering every call individually for possibilities of run-time error has to be the _norm_ when developing applications.)
+
+It is worth considering the above three possible errors in a little more detail.
+For example, opening a timer can fail for two reasons:
+
+* lack of memory for the timer control block in the application data space
+* lack of memory in the operating system dataspace for the real timer entry.
+
+Now whilst an application may be able to ensure that the first possibility never arises -- by means of setting its minimum heap appropriately -- it can never be sure of preventing the second case.
+The number of timers allocated in operating system dataspace depends not on
+circumstances _within_ the original application, but rather on what _other_ applications have done.
+If other applications running simultaneously happen to make heavy use of timer resources, the operating system may not be able to set aside the one timer channel requested by _Events_.
+
+Should this occur, the code in `OpenTimer` and `Check` ensure that a suitable error message is passed back to the user.
+The user can then take action to shut down some of the other applications running simultaneously on the computer, before trying to start _Events_ again.
+
+The case of the channel to the console device is similar.
+This time, it is resources of (for example) the Window Server which may be unable to meet the request made.
+Likewise when the console window is sized (at which time various arrays or back-up bitmaps need to be allocated).
+
+==== Fatal errors and non-fatal errors
+
+The three possible errors in _Events_ are all treated as being _fatal_: the application initialisation fails, so the application terminates.
+
+This kind of action makes good sense for errors during the initialisation of an application, but cannot on the whole be tolerated for errors during the main phase of an application (ie after the initialisation is complete).
+By this time, the user may well have committed some data into the application, which would be lost if the application suddenly terminated.
+
+In these cases, a _retry_ philosophy is much more appropriate: the application cleans up any interim semi- allocated resources, "rolls back" to its previous good state, and presents an error message informing the user what has happened.
+It is up to the user to try to correct the error condition, and then re-initiate the previous action.
+
+==== When resources need to be tidied explicitly
+
+It may be noted that there are no calls to `p_close` in `events.c`.
+These calls are unnecessary in this program, because the channels are automatically closed, by the operating system, when the application exits.
+
+This situation must be contrasted carefully with that when a resource (such as a channel to an i/o device) is used _transiently_ by an application.
+In this case, it _must_ be freed as soon as it is no longer needed.
+
+=== Inter-Process Communication _Events2_ and _Subproc_
+
+_Events2_ extends the functionality of _Events_ by supporting the facility to launch a sub-process.
+A sub-process is automatically started during program initialisation, and once it has terminated, the user can press *ENTER* to re-launch it again.
+
+The sub-process mimics the carrying out of some extended activity.
+When it finishes, it signals the fact of its completion to _Events2_, together with an "answer", which _Events2_ displays on the screen.
+This answer has in fact been calculated from a parameter passed by _Events2_ to _Subproc_ on the command line.
+
+_Subproc_ and _Events2_ therefore carry out a restricted form of inter-process communication, and thereby illustrate some of the multi-tasking possibilities in writing software for SIBO computers.
+
+==== A third event source
+
+_Events2_ remains alert to the possibility of a signal from _Subproc_, even though it is busy responding to timer events and keyboard events.
+_Events2_ manages this via a straightforward extension of the architecture in _Events_: one more "event source" is added into the picture.
+
+Thus there is one more status word -- `substat` -- and one more test in the main loop in `main`:
+
+[source,c]
+----
+else if (substat!=E_FILE_PENDING)
+    ReportSub();
+----
+
+That is, whereas main used to poll up to two status words, on returning from a call to p_iowait, it now polls up to three status words: `substat` in addition to `keystat` and `timstat`.
+
+However, this new event source differs from the previous two in that it is not an i/o device.
+There is no `p_ioa` call to request notification from _Subproc_; rather, the corresponding "queue" call is `p_logona`.
+In the line of code
+
+[source,c]
+----
+p_logona(pid,&substat);
+----
+
+the calling application (_Events2_) is requesting asynchronous notification of the eventual termination of the process identified by pid.
+This notification consists of two parts (now familiar):
+
+* a value other than `E_FILE_PENDING` is written into `substat`
+* the application is signalled (so that its i/o semaphore increments).
+
+==== How Events2 passes data to Subproc
+
+_Events2_ passes its original data to _Subproc_ via the command line.
+
+In any case like this, there has to be an agreement between the two processes as to the format of the command line.
+Here, the protocol is established in the shared header file `subproc.h`, which defines the following struct:
+
+[source,c]
+----
+typedef struct
+    {
+    HANDLE pid;
+    VOID *poff;
+    ULONG data;
+    } SUBPROC_CL;
+----
+
+The members of this struct serve the following purposes:
+
+* `pid` identifies the process which launched _Subproc_ (ie _Events2_)
+* `poffan` address within the dataspace of _Events2_ where _Subproc_ should in due course write back the "answer" it discovers
+* `data` the original seed data for _Subproc_ to operate with.
+
+The following code sets up this struct and creates and runs _Subproc_:
+
+[source,c]
+----
+LOCAL_C VOID LaunchSub(VOID)
+    {
+    HANDLE pid;
+    SUBPROC_CL cl;
+    TEXT subname[P_FNAMESIZE];
+
+    p_fparse("subproc.img",DatCommandPtr,&subname[0],0);
+    cl.pid=p_getpid();
+    cl.poff=(&answer);
+    cl.data=p_date();
+    if ((pid=p_execc(&subname[0],&cl,sizeof(cl)))<0)
+        {
+        p_notifyerr(pid,"Failed to launch subprocess",0,0,0);
+        return;
+        }
+    p_logona(pid,&substat);
+    p_presume(pid);
+    }
+----
+
+The variable answer is a static.
+Clearly, it would be a significant error to include it on the stack of `LaunchSub`, since this stack will have unwound before answer gets written to (by _Subproc_).
+
+As can be seen, in this example, the data value passed to _Subproc_ is just the current time/date, as returned by `p_date`.
+
+Note the call to `p_fparse`, which calculates the presumed full pathname of `subproc.img`, under the assumption that this is in the same directory as `events2.img`.
+(The full path of `events2.img` is written to `DatCommandPtr` by the operating system, when Events2 starts running.)
+
+For more on the operation of `p_logona`, see the _PLIB Reference_
+manual.
+
+==== The code in Subproc
+
+The code in `subproc.c` is very straightforward:
+
+[source,c]
+----
+#include <p_std.h>
+#include <p_gen.h>
+#include <p_math.h>
+#include <epoc.h>
+#include "subproc.h"
+
+GLREF_C TEXT *DatCommandPtr;
+
+GLDEF_C INT main(VOID)
+    {
+    TEXT *pb;
+    SUBPROC_CL *pcl;
+    UWORD answer;
+    WORD logstat;
+
+    pb=DatCommandPtr+p_slen(DatCommandPtr)+1;
+    if (*pb!=sizeof(SUBPROC_CL))
+        return(E_GEN_ARG);
+    pcl=(SUBPROC_CL *)(pb+1);
+    if (!p_logona(pcl->pid,&logstat))
+        {
+        answer=(UWORD)(p_randl(&pcl->data)%(2*60*32));
+        p_sleept(answer);
+        if (logstat<0)
+        p_pcpyto(pcl->pid,pcl->poff,&answer,sizeof(UWORD));
+        }
+    return(0);
+    }
+----
+
+The way Subproc mimics performing a lengthy calculation is simply to call `p_sleept`, for some random period up to two minutes in duration.
+
+Note that Subproc exits at once if the command line passed to it is not of the expected type.
+On most SIBO computers, the result of an application calling `p_exit` with a negative value is a Notifier reporting the abnormal exit.
+
+Note too that just as Events2 asynchronously logs onto Subproc, Subproc logs onto Events2.
+However, this is for a different reason.
+Namely, Events2 might terminate in the meantime, while Subproc is busy "calculating".
+In this case, a non-negative number will be written into `logstat`.
+If Subproc ignored this fact and proceeded regardless to `p_pcpyto` data into the process currently having identifier `pcl->pid`, in all probability the call would fail -- process identifiers take a long time to get re-used, and the operating system would ignore the `p_pcpyto` on account of a non-existent `pid` being specified.
+But there is always an outside chance that the `pid` will indeed be re-used by the time Subproc has completed -- in which case the `p_pcpyto` could cause random damage to a blameless application.
+
+The reason there is a test on the result of the `p_logona` call in Subproc is to guard against the rare case of Events2 exiting even before Subproc reaches the `p_logona` call.
+
+==== Mechanisms for inter-process communication
+
+The above mechanism is a very simple illustration of a form of IPC (_inter-process communication_).
+Epoc supports a considerable range of IPC services, chief amongst them being IPC messaging.
+
+Messaging also involves the same principles of status words, synchronous or asynchronous requests, and signalling an application.
+In some cases, one process will signal another one explicitly, using the function `p_iosignalbypid`; in other cases, the signalling is performed by the operating system, say in response to a `p_mfree` call in an application (indicating that the message sent has been processed).
+
+See the _PLIB Reference_ manual for more details of these different forms of IPC.
+
+==== Debugging cooperating applications
+
+One method of debugging the interaction between Events2 and Subproc is as follows:
+
+* leave both image files in the same directory on the PC
+* in that directory, type sdbg events2 to start debugging Events2
+* place a breakpoint on the `p_logona` call in `events2.c`
+* run Events2 until it reaches this breakpoint
+* note incidentally that the `p_fparse` call in `LaunchSub` automatically deduces that since Events2 has been launched from a remote directory (ie on the PC), Subproc should also be launched (if possible) from this same remote directory
+* when the Debugger breaks at the `p_logona` call, the code and data segments for Subproc will already be created (by virtue of the prior `p_execc` call)
+* refresh the main list of remote processes; select Subproc and break into it (use the Break Into menu command)
+* scan to the beginning of main in `subproc.c` and set a breakpoint there
+* issue the Apply Breakpoints menu command (whence the windows will go blank)
+* switch back to the window debugging Events2 and step over the `p_presume` call
+* this will have the effect of starting the execution in Subproc -- in which case the breakpoint in main will be reached.
+
+Debugging now continues, with two different debugging windows -- one for Events2, and one for Subproc.
+
+==== Error handling in Events2
+
+The call to `p_execc` in Events2 can fail for a variety of reasons -- chief amongst them lack of system memory.
+Note that Events2 does not treat this as a fatal error; rather, the error is reported to the user, and the program carries on (taking care to leave the internal variable `subexist` set correctly).
+
+The user has the opportunity to respond to the message by freeing up some system memory, and then pressing kbd:[Enter] to make another attempt to launch Subproc.
+
+==== Socially responsible programming in Events2
+
+There is one more change between `events.c` and `events2.c`, which actually corrects a bug deliberately left in Events.
+This change is the addition of a call to `p_unmarka` at the start of `main`.
+
+If a SIBO computer is left switched on while Events is running, it will fail to auto-switch-off subsequently.
+This is because of the regular timer activity in the program, which keeps resetting the inactivity counter of the computer.
+
+Suppose that the user turns the computer off explicitly.
+However, if an alarm rings at some stage, Events will start running again, and if the user is not at hand to notice the alarm, the result will soon be flattened batteries -- regardless of the auto-switch-off setting.
+(Try it and see.)
+
+However, the addition of the call to `p_unmarka` prevents any activity within Events2 from resetting the inactivity counter.
+As a result, Events2 is much more socially responsible than its precursor.
+
+See the _PLIB Reference_ manual for more details on `p_unmarka`.
+
+=== Data received from a serial port
+
+Events3 extends the functionality of Events2 by including yet another event source: data received from a serial port.
+Characters are read one at a time from the serial port and, if they are printable, they are echoed onto the screen.
+
+For background information on the serial port, see the _Serial Port_ chapter of the _I/O Devices Reference_ manual.
+
+==== Opening the serial port
+
+The serial port is an i/o device: before services such as `P_FREAD` can be requested from it, a suitable channel has to be opened.
+
+The contents of the `OpenSer` routine in `events3.c` are as follows:
+
+[source,c]
+----
+LOCAL_C VOID OpenSer()
+    {
+    INT ret;
+    ret=p_open(&serH,"TTY:B",-1);
+    if (ret<0)
+        ret=p_open(&serH,"TTY:A",-1);
+    if (ret<0)
+        {
+        p_notifyerr(ret,"Opening serial port",0,0,0);
+        serH=0;
+        }
+    }
+----
+
+If the attempt to open `TTY:B` fails, an attempt is made to open `TTY:A` instead; only if both attempts fail is this fact reported to the user.
+
+Typical reasons for it being impossible to open a serial port are that port already being in use (eg by Link software) or the port not being physically present.
+
+In contrast to the retry mechanism for launching Subproc which is built into Events3, there is no corresponding retry mechanism for opening the serial port.
+A trivial amendment could be made to allow this.
+
+==== Active and inactive event sources
+
+Events3 adds this fourth event source to the bottom of the prioritised list in main, which now has the following schematic form:
+
+[source,c]
+----
+GLDEF_C VOID main(VOID)
+    {
+    INITIALISE();
+    QueueTimer();
+    QueueKey();
+    LaunchSub();
+    QueueSer();
+    FOREVER
+        {
+        p_iowait();
+        if (keystat!=E_FILE_PENDING)
+            {
+            PROCESS_KEY();
+            QueueKey();
+            }
+        else if (timstat!=E_FILE_PENDING)
+            {
+            PROCESS_TIMER();
+            QueueTimer();
+            }
+        else if (subexist && substat!=E_FILE_PENDING)
+            ReportSub();
+        else if (serH && serstat!=E_FILE_PENDING)
+            {
+            p_tickle();
+            DisplaySerChar();
+            QueueSer();
+            }
+        }
+    }
+----
+
+Note however that the test for whether to call `ReportSub` has changed its form slightly.
+No longer is it sufficient just to poll `substat`; it is also necessary to check on the current value of `subexist`:
+
+* `subexist` is set to `TRUE` when Subproc is successfully launched
+* `subexist` is set back to `FALSE` whenever it is discovered that Subproc has completed
+* thus the only time the value of `substat` should be polled is when `subexist` is `TRUE`.
+
+Without this double check, a variety of bugs can be demonstrated -- all of which stem from serial port events being misinterpreted as reports of Subevent completing.
+
+Similarly, for the sake of correctness, the value of `serH` should be tested before going on to poll `serstat`: `serH` is `0` if it has proved impossible to open a serial port.
+(Actually, no immediate harm will ensue if the check on `serH` is omitted, given that this is the last of the event sources in the priority list.)
+
+The reason no corresponding checks are required for the keyboard and timer event sources is that these event sources are always active:
+
+* the program terminates at once if it proves impossible to open a channel to these devices
+* every time an event is delivered from these sources, another request (for yet another event) is issued straightaway.
+
+The variables `serH` and `subexist` in Events3 play the role of what are sometimes called _active words_ for their event sources -- complementing the roles of their status words:
+
+* active words have to be set and cleared by the application itself
+* status words are written to by system software; generally, application software only _reads_ the values of status words
+* active words are set when a request is _made_; status words are set when a request _completes_.
+
+One other possible advantage in maintaining active words for event sources is to avoid making the mistake of sending a `P_FCANCEL` request to an i/o channel which has not had a read request made on it.
+Some i/o devices panic the application if this happens.
+
+==== Debugging applications with serial comms
+
+Programs involving serial comms are inevitably harder to debug than without serial comms.
+This is because the Debugger itself uses up one serial port on the computer.
+In general, Events3 will be unable to open any serial port currently being used by Link software (such as the SIBO Debugger).
+One possibility, however, is to use say port `A` to debug the application, and send serial data to the application via port `B`.
+
+==== The role of `p_tickle`
+
+Whenever serial port data is received by Events3, a call is made to `p_tickle` to reset the inactivity counter.
+This prevents the computer from auto-switching off part way through processing an incoming stream of serial data.
+
+Note that there is no requirement to make a corresponding call whenever a keypress is received, since the operating system does this automatically.
+
+Finally, it would of course be an error to make this call whenever the timer expires -- since this would keep the computer permanently switched on.
+
+Note that some early versions of the Epoc operating system may fail to support `p_tickle` (versions prior to 2.11).
+
+=== Yielding CPU in compute-intensive programs
+
+Events4 adds in yet another type of event source -- one that is subtly different from all the others so far introduced.
+This is an event source which is always ready to run immediately.
+However, it is deliberately located in a low position in the priority listing, to ensure that other event sources are processed preferentially.
+
+A real-life example of such an event source would be a recalculation computation in a spreadsheet, or a reformatting calculation in a word processor.
+Again, a long file operation -- such as building the index of a DBF file -- should also be broken up into chunks, so as to let the application to respond to other event sources in the meantime.
+Finally, a game may think indefinitely until such time as it is told to stop.
+
+In Events4, this continual "thinking" is simulated by continually adjusting the display of part of the boundary of the console window.
+The constant visible change is meant to reflect constant internal activity.
+
+==== Idle objects
+
+Event sources such as just discussed are sometimes referred to as _idle objects_.
+The meaning of the name is that they only get a chance to run when the application is _otherwise_ idle.
+For example, if an application is busy responding to keypresses, it is certainly not idle, and so any idle objects have no opportunity to run.
+
+On the other hand, this name is of course potentially misleading, since the activity represented by the idle object is anything but idle.
+
+==== The meaning of calling `p_iosignal`
+
+The contents of the "queue" routine for the idle object in Events4 is just the single line
+
+[source,c]
+----
+p_iosignal();
+----
+
+Since there is no genuine i/o connected with an idle object, there is no system software that automatically signals the application when the i/o has completed.
+That is why the "queue" routine itself calls `p_iosignal`.
+
+At the same time, it might be thought that this routine should write to a status word.
+Actually, however, there is no point in doing so: what matters is simply that the event source is active; in that case, it is automatically ready to deliver an "event" (ie to take more CPU).
+
+Just as some event sources have no need to maintain an active word (since they are always active), others (ie idle objects) have no need to maintain a status word, since whenever they are active, they are read to deliver an event.
+
+==== One drawback of continuous activity
+
+Interestingly, Events4 has re-introduced the "stay awake" bug that Events2 managed to fix from Events.
+This fact can easily be verified by user experimentation.
+
+The call make to `p_unmarka` is now ineffective since, as is explained in the _PLIB Reference_ manual (section on `p_unmarka`), it is the `sys$null` process which administers the auto-switch-off, yet it will have no opportunity to run if any other applications are continually running.
+The point is that the priority of `sys$null` is lower than that of any other process.
+
+One possible solution here is to call, say, `p_sleept(2)` every so often, to try to allow `sys$null` to run.
+However, this too will fail in the rare case when there are two similarly anti-social applications running simultaneously on the SIBO computer.
+Even if they both call `p_sleept` periodically, there is little chance of them both sleeping at the same time -- which would be required in order for `sys$null` to run.
+
+A better solution is to call `p_allowoff` from time to time.
+By doing so an application assumes responsibility for performing the auto-switch-off that would otherwise be done by sys$null if it had an opportunity to run.
+
+==== Remarks on process priorities
+
+The above problem of preventing the SIBO computer from auto-switching off is not the only potentially deleterious side-effect of continuous activity.
+Just as continuous activity within Events4 prevents sys$null receiving any CPU, so too will any other lower priority processes be locked out.
+
+As it happens, Subproc and Events4 both run at the same process priority -- the default of `0x80`.
+(See the chapter Building an Application for details on how process priorities are initialised.)
+However, suppose the process priority of Subproc were lowered to say `0x70`.
+In that case, continuous activity within Events4 would mean that Subproc, although launched, would never receive any CPU.
+Thus Events4 would perpetually display the message "Subp launched", but never the completion message "Subp slept xxx ticks".
+
+The solution here is that any process about to become computationally intensive over a long period of time should consider lowering its process priority, say to `0x70` -- using the call `p_setpri`.
+For some related discussion, see the section on wStartCompute in the Window Server Reference manual.
+
+==== The call `p_ioyield`
+
+One more potentially surprising fact about continuous activity within a program ought to be mentioned.
+
+Clearly, not every program needs to be structured with an `asynchronous event processing loop` as in the Events programs.
+Whilst such a loop is undoubtedly the correct architecture for a larger program, other simple programs may have alternative structures.
+
+For example, Subproc makes no call to `p_iowait` -- nor does it need to, being purely single-threaded.
+Again, the example PLIB programs discussed in the chapter _Building an Application_ (eg `p_hello`, `p_comp` and `p_prndir`) likewise survive without an asynchronous event processing loop, since they are likewise single-threaded.
+
+However, there may be a temptation for programs to use the following _semi-asynchronous_ mechanism, in order to be able to respond to keypresses (say) whilst being mainly dedicated to some continuous activity:
+
+* continue processing queue an asynchronous request to receive a keypress
+* start the continuous activity
+* every so often, test to see if the status word is still `E_FILE_PENDING`
+* if it is, continue processing
+
+In other words:
+
+[source,c]
+----
+FOREVER
+    {
+    QueueSer(&keystat);
+    while (keystat==E_FILE_PENDING)
+        MoreProcessing();
+    ProcessKey();
+    }
+----
+
+However, this program may totally fail, with `keystat` never changing from `E_FILE_PENDING`.
+
+The reason for this is rather complicated, but it is worth understanding.
+It has to do with what happens when an asynchronous event completes.
+This completion often involves _two distinct phases_:
+
+* the completion itself happens on an interrupt
+* an interrupt service routine runs, and the i/o device changes some of its internal variables to record this fact
+* however, the i/o device generally cannot write to the associated status word during the interrupt service routine itself
+* this is because there are strict rules on what can and cannot be done within an interrupt service routine (see the chapter _Writing Device Drivers_ in the _Additional System Information_ manual for more details)
+* instead, the i/o device relies upon its so-called wait handler routine to be called, so that it can finish the job of completing the request -- writing to the status word and signalling the application
+* these wait handler routines only have an opportunity to run inside the call `p_iowait` (or equivalent).
+
+In other words, the description given earlier in this chapter of the functioning of `p_iowait` was incomplete in one important respect: not only does this routine take note of the value of the i/o semaphore for the application, and suspend the application so long as this remains negative; it also gives all i/o device channels in the application an opportunity to run their wait handlers.
+
+Accordingly, the earlier code has to be changed into
+
+[source,c]
+----
+FOREVER
+    {
+    QueueSer(&keystat);
+    while (keystat==E_FILE_PENDING)
+        {
+        MoreProcessing();
+        p_iosignal();
+        p_iowait();
+        }
+    ProcessKey();
+    }
+----
+
+which is in fact much more in line with the main routine of the Events4 application discussed.
+
+For convenience, the single call `p_ioyield` can be used with the same effect as `p_iosignal` followed by `p_iowait`.
+
+Note incidentally that it is a rare application that needs to actually write a wait handler; there is of course no need to write a wait handler routine just because an application involves asynchronous i/o.
+
+=== General remarks
+
+==== Multi-threadedness and multi-tasking
+
+For the sake of clarity, the two different notions of _multi-tasking_ and _multi-threadedness_ ought to be compared and contrasted:
+
+* multi-tasking involves two (or more) different processes; multi-threadedness involves two (or more) event sources _within one process_
+* the operating system takes care of multi-tasking automatically, on behalf of applications; multi- threadedness requires conscious effort from an application
+* multi-tasking is _pre-emptive_ in that a process with a higher priority that is ready to run will always displace a lower priority process that is running
+* multi-threadedness is _non_ pre-emptive in that an event source with a higher priority has to wait until a lower priority event source voluntarily gives up CPU, before being able to run.
+
+==== Subprocess or idle object?
+
+In the design of large systems, there is considerable scope for decision-making on whether to assign compute-intensive tasks to idle objects within an application, or to a subprocess of the application proper.
+Some factors that may be considered in making such a decision are:
+
+* having two different processes automatically allows a total combined  dataspace greater than 64k
+* a subprocess need not worry unduly about creating "holes" ("fragmentation") in its allocator heap, since these will all vanish when the subprocess terminates (when its entire heap vanishes); however, if an idle object is transient and terminates well before the overall application finishes, any fragmentation it creates in the allocator heap may have a more damaging long-term effect (see the chapter _Memory Allocation_ in the _PLIB Reference_ manual)
+* an idle object is much more tightly bound to the main program than is a subprocess
+* communications between a subprocess and the main program have to be much more formalised than is the case with an idle object
+* an idle object can draw to the same windows on the screen as the main application, but not so for a subprocess (except in the case of the MC -- see the function `wAttachToClient` in the _Window Server Reference_ manual).
+
+==== Window redraws as an event source
+
+Up till now, one very important event source has not been mentioned in this chapter.
+This is the event of a window requesting itself to be redrawn.
+(In fact, the request originates from the Window Server.)
+
+These events do not occur when using console i/o, nor when using windows with back-up bitmaps: windows are automatically redrawn by the Window Server in these cases.
+However, high quality applications undertake window redrawing by themselves, so as to avoid the large ram overheads of the back-up bitmaps.
+(See the _Introduction_ chapter of the _Window Server Reference_ manual.)
+
+Such applications must remain responsive to redraw events at all times -- otherwise their screen will remain blank if they are suddenly task switched into foreground, or if an overlapping menu or dialog window is removed.
+This is all the more reason for these applications to adopt the sort of general event processing architecture outlined in this chapter.
+
+==== The `APPMAN` and `ACTIVE` classes in OLIB
+
+The `APPMAN` and `ACTIVE` classes in `olib.dyl` provide system support for object-oriented applications
+
+* representing their event sources (each event source is represented by an "active object")
+* prioritising these event sources
+* maintaining active and status words for each event source
+* calling `p_iowait` at appropriate times
+* ensuring that all event sources are properly polled.
+
+At the same time, the `APPMAN` class ("appman" is short for "application manager") provides an automated mechanism for error handling, as well as handling the interface to resource files (see the _Resource Files_ chapter in the _Additional System Information_ manual).
+
+These topics are further discussed in the _Object Oriented Programming Guide_.
+In addition, the `APPMAN` and `ACTIVE` classes are documented in the _OLIB Reference_ manual.
+

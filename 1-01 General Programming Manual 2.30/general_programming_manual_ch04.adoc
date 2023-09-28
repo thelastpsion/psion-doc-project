@@ -1,0 +1,209 @@
+== NOTES ON CLIB
+
+This chapter provides some additional information about the implementation of CLIB, the version of the TopSpeed C library for the Epoc operating system.
+It need be read only by developers who wish to use CLIB (for example, to port existing code from another program).
+Developers who stick to PLIB can skip this chapter entirely.
+
+The difference between PLIB and CLIB is explained in the previous chapter.
+
+=== Functions missing from the MS-DOS JPI C library
+
+The following functions are not included in the EPOC version of CLIB because they rely on the IBM PC hardware, far or huge pointers, or direct MS-DOS functions calls.
+For many of the missing function calls there is an equivalent function or set of functions which may be called from either PLIB or WLIB.
+
+[cols="3*m"]
+|===
+|absread|abswrite|allocmem
+|_arc|at|Awaited
+|bdos|bdosptr|bioscom
+|biosdisk|biosequip|bioskey
+|biosmemory|biosprint|biostime
+|_bios_disk|_bios_equiplist|_bios_keybrd
+|_bios_memsize|_bios_printer|_bios_serialcom
+|_bios_timeofday|_chain_intr|change
+|_clearscreen|convert|coordscountry
+|ctrlbrk|_cube|Delay
+|delay|_directwrite|_displaycursor
+|_dosbeginthread|_dosendthread|dosexterr
+|_dosfreestack|_dos_allocmem|_dos_close
+|_dos_creat|_dos_creatnew|_dos_findfirst
+|_dos_findnext|_dos_freemem|_dos_getdate
+|_dos_getdiskfree|_dos_getdrive|_dos_getfileattr
+|_dos_getftime|_dos_gettime|_dos_getvect
+|_dos_keep|_dos_open|_dos_read
+|_dos_setblock|_dos_setdate|_dos_setdrive
+|_dos_setfileattr|_dos_setftime|_dos_settime
+|_dos_setvect|_dos_write|_ellipse
+|_expand|execle|execlpe
+|execve|execvpe|farcalloc
+|farcoreleft|farfree|farmalloc
+|farrealloc|fcalloc|_fexpand
+|_ffree|_fheapchk|_fheapset
+|_fheapwalk|_floodfill|_fmalloc
+|_fmsize|_FP_OFF|_FP_SEG
+|_frealloc|freemem|geninterrupt
+|_getbkcolor|getcbrk|_getcolor
+|getcurdir|_getcurrentposition|getdfree
+|getdta|getfat|getfatd
+|_getfillmask|_getimage|_getlinestyle
+|_getlogcoord|_getphyscoord|_getpixel
+|getpsp|gettime|gettext
+|_gettextcolor|gettextinfo|_gettextposition
+|getvect|getverify|_getvideoconfig
+|halloc|_harderr|_hardresume
+|_hardretn|hfree|hide
+|highvideo|hmemccpy|hmemchr
+|hmemcmp|hmemcpy|hmemicmp
+|hmemset|hrealloc|info
+|Init|intdos|intdosx
+|ioctl|keep|_lineto
+|Lock|locking|lowvideo
+|mktemp|MK_FP|movedata
+|movetext|_moveto|ncalloc_
+|_ms_cursor|_ms_driversize|_ms_getmotion
+|_ms_getpage|_ms_getpress|_ms_getrelease
+|_ms_getsensitivity|_ms_getstatus|_ms_lightpen
+|_ms_reset|_ms_restoredriver|_ms_savedriver
+|_ms_setdouble|_ms_setgraphcursor|_ms_setinterrupt
+|_ms_setmickeys|_ms_setpage|_ms_setposition
+|_ms_setrange|_ms_setsensitivity|_ms_settextcursor
+|_ms_swapinterrupt|_ms_updatescreen|normvideo
+|nosound|Notify|obsucredat
+|_outtext|palettecolor|palettecolorused
+|paletteopen|parsfnm|peek
+|peekb|_pie|poke
+|pokeb|_polygon|putbeneath
+|_putimage|putontop|puttext
+|randbrd|randbwr|readbufferln
+|_rectangle|_remapallpallete|_remappallete
+|_selectpalette|SEND|_setactivepage
+|_stbkcolor|setblock|setcbrk
+|_setcliprgn|_setcolor|setdta
+|setftime|_setfillmask|setframe
+|_setlinestyle|setlogorg|setpalette
+|setpalettecolor|_setpixel|_settextcolor
+|_settextposition|_settextwindow|settitle
+|setvect|setverify|_setvideomode
+|_setviewport|_setvsualpage|snapshot
+|sound|spawnle|spawnlpe
+|spawnve|spawnvpe|StartProcess
+|StartScheduler|StopProcess|StopScheduler
+|tempnam|textattr|textbackground
+|textcolor|textmode|tmpnam
+|top|Unlock|use
+|used|WAIT|window
+|windowclose|windowopen|_wrapon
+|_wrbufferln||
+|===
+
+=== `int86x`
+
+`int86x` is implemented by exactly the same code as `int86`, ie the values in the segment registers struct are ignored.
+This is because in the pure small model `DS=ES=SS` and hence there is never any need to change the values in the segment registers.
+
+=== `intr`
+
+As for `int86x` above, the values in the segment registers are ignored.
+
+=== File handle conversion routine
+
+[source,c]
+----
+void *getRealHandle(int handle);
+----
+
+Returns a PLIB file handle, given a CLIB file handle.
+Returns `NULL` if the handle is not currently allocated.
+
+=== The console channel
+
+Programs built with the CLIB start-up module automatically open a console channel.
+The channel is also automatically assigned to `stdin`, `stdout` and `stderr`, unless they have been redirected.
+
+It may prove useful to get the actual PLIB handle for the console channel.
+This can be achieved by either calling `getRealHandle(fileno(stderr))` or by referencing the global `_winHandle` as follows:
+
+[source,c]
+----
+extern void *winHandle;
+----
+
+You can prevent the automatic opening of a console channel by defining the function `p_xwind` in your code, as in the following example:
+
+[source,c]
+----
+extern void *winHandle;
+
+void p_xwind(void)
+    {
+    winHandle=(void *)1;
+    }
+int main(void)
+    {
+    ...
+    return(0);
+    }
+----
+
+You should ignore the warning, given during the linking of your program, that the symbol `_p_xwind` is duplicated.
+
+If you use this technique your program should not, of course, make any reference to `stdin`, `stdout` or `stderr`, unless you have redirected them.
+Setting `winHandle` to `1` (an illegal value for a handle) will guarantee that any such reference will fail with a panic.
+
+=== MS-DOS file names
+
+Applications written for the Epoc O/S should in general avoid making any assumptions about file names (see the _Files_ chapter in the _PLIB Reference_ manual) and should use `p_fparse` and `p_chdir` to manipulate file names and navigate directory paths.
+However the `LOC::` file system on all SIBO machines is totally MS-DOS compatible.
+Thus CLIB supports the TopSpeed STD C library functions `findfirst`, `findnext`, `getcwd`, etc which rely on MS-DOS naming conventions.
+However if an attempt is made to use these functions on other filing systems, such as `REM::`, the routines will return an error.
+
+=== Floating point emulator
+
+As the SIBO architecture does not allow for an 8087 maths coprocessor,
+all floating point is performed by software emulation of the 8087.
+
+Normally the emulator code would be linked in with your program for MS-DOS ``exe``s, but under Epoc O/S the emulator is provided by an LDD called `SYS$8087.LDD` in `\sibosdk\lib\`.
+Any programs requiring the emulator will automatically load the LDD and free it again when it is no longer required.
+This has the advantage of saving about 8K of code from your program and allows the LDD to be shared by multiple processes.
+
+The C startup module (see `r_emul.a`) will look for the LDD in the directory in which your program was executed.
+If it is not found the it will use the environment variable `EM$` (remember to use capitals for the name as environment variables in Epoc O/S are case sensitive).
+
+=== Panic 80
+
+An application which terminates with a "panic 80" before it even starts has almost certainly failed to locate `SYS$8087.LDD`.
+There are three steps that can be taken to avoid the panic:
+
+[arabic]
+. move a copy of the LDD into the directory where the program will execute from
+. set the environment variable `EM$` appropriately (eg using a short program)
+. rewrite the program so that it does not require the use of the LDD.
+
+See the _Floating Point_ chapter of the _PLIB Reference_ manual for some more details.
+
+Note that floating point instructions can easily be generated unexpectedly (eg to push or pop floating point registers) if the recommended build configuration pragmas are "improved" in any way -- resulting in panic 80s "out of the blue".
+If in doubt, inspect the object code using the SIBO Debugger (or use the TopSpeed disassembler, `tsda`).
+
+=== Building the CLIB library and header objects
+
+To build the CLIB library you must have purchased the Professional variant of the SIBO SDK.
+This version includes the C Library Source Kit and the corresponding EPOC CLIB Library Source.
+Since some of the EPOC CLIB source modules are written in C+\+, you will also need to have separately purchased TopSpeed C+\+.
+
+Simply startup `TS` in the `SRC` directory of `SIBOSDK`.
+Select `CLIB` as the project file and then `MAKE` the project.
+The libraries and objects will be generated in the `SRC` directory and need to be copied into the `LIB` directory.
+There is a batch file `INST.BAT` which will do this for you.
+
+Note that, in addition to the CLIB library, there is also an RLIB component.
+This contains elements that are common between CLIB and PLIB.
+
+The source code modules for PLIB and WLIB are currently in Turbo Assembler format and are not buildable using the TopSpeed assembler.
+They have not been included in this release of the SDK.
+The vast majority in any case are simple shells which just juggle registers.
+
+=== Cautionary note
+
+It is advisable to tread cautiously when changing the library, and under no circumstances should the pragmas be changed in either `TSPRJ.TXT` or `STDEPOC.H`.
+
+

@@ -1,0 +1,185 @@
+== INSTALLATION
+
+The _Psion SIBO 'C' Software Development Kit_ (SDK) enables you to
+develop applications in 'C' for the Psion SIBO family of hand-held and
+notebook computers:
+
+* the HC range of corporate handheld computers
+* the Series3 range of palmtop computers
+* the MC range of laptop mobile computers.
+
+The SDK is PC based -- that is, you write and build your applications on a IBM PC or compatible and then run (or debug) the application on a SIBO computer.
+
+The SIBO SDK comes in three variants: _Professional (Prof)_, _Standard (Std)_, and _Documentation (Doc)_.
+The Prof and Std variants contain differing amounts of the _TopSpeed C Package_ (produced by the Clarion Software Corporation):
+
+* the Prof variant contains the complete TopSpeed C Package
+* the Std variant omits the TechKit and C Library Source Kit portions of the TopSpeed C Package.
+
+Parts of the TopSpeed C Package are required in order to build any SIBO application.
+These are the parts included in the Std variant of the SDK.
+
+The TopSpeed C Package may be used independently of the SDK to write C programs to run on IBM PCs and compatibles.
+
+All three variants of the SDK contain the same three volumes of SDK documentation, comprising 14 different manuals all told, together with associated software produced by Psion.
+This software incorporates libraries, header files, auxiliary programming tools, example programs, and much more besides.
+
+=== Installation
+
+There are three phases to installing the SIBO SDK:
+
+* installing the small code model of the TopSpeed C Package
+* installing Psion software and example programs
+* customising the TopSpeed system using special Psion files.
+
+For information on installing the TopSpeed system, see the TopSpeed C documentation.
+(You may install other code models as well as the small code model, but they will not be used by the SIBO SDK).
+The Psion software consists of _required_ parts and _optional_ parts.
+*For a full description of all the available files, see the `read.me` files in the root directories on the supplied disks.*
+
+The files on the disks are in compressed ("zipped") form.
+The disks contain the pkzunzip program, which can be used to decompress ("unzip") the other files as they are copied.
+The installation procedure ensures that each group of files is copied to its correct directory.
+The `read.me` files on the disks specify which files are present in each group.
+
+==== Directory structure
+
+The TopSpeed software is usually located in a `\ts\` directory tree.
+
+The Sibosdk software is usually located in a `\sibosdk\` directory tree.
+
+There is no need for the `\ts\` and `\sibosdk\` directory trees to be on the same partition of your hard disk.
+Eg the TopSpeed system could be on drive `c:`, with the Sibosdk system on drive `d:`.
+
+Both the `\ts\sys` and `\sibosdk\sys` directories should be added to the MS-DOS path.
+Alternatively, you may copy the contents of `\sibosdk\sys` (with the probable exception of the `ts.red` redirection file -- see _Customising the redirection file_ below) to `\ts\sys`, in which case you will only need to add the `\ts\sys` directory to the MS-DOS path.
+
+Subdirectories under `\sibosdk\` include:
+
+[cols="1,5"]
+|===
+| `lib`
+| the location of standard libraries, startup objects, and some loadable device drivers (dynamic extensions to the SIBO operating system)
+
+| `include`
+| the location of header files
+
+| `sys`
+| the location of the SIBO Debugger and other miscellaneous programming tools
+
+| `pr`
+| the location of some standard project files
+
+| `demo`
+| the location of various standard demo programs
+
+| `s3atool`
+| Series 3a versions of an icon editor and the Spy application
+
+| `src`
+| (not present in all versions) the location of the source code for the Clib (standard C) library
+
+| `hwdemo`
+| (optionally) the location of programs demonstrating use of the HWIF library
+
+| `hwifsrc`
+| (optionally) the entire, buildable, source of the HWIF library, for interest and/or to allow the writing of extensions to HWIF
+
+| `wd`
+| (optionally) the source printer scripts of some WDR printer driver files
+
+| `ldd`
+| (optionally) the source code of some example device devices
+
+| `hcmast`
+| (optionally) software allowing alternative versions of the HC rom to be built 
+
+| `wkdemo`
+| (optionally) source code of example software for the Workabout
+
+| `fconv`
+| (optionally) software allowing the creation of file format conversion DYLs for Word
+
+| `oopdemo`
+| (optionally) the location of programs demonstrating the basic use of the Object Oriented Programming system (other directories contain more advanced examples)
+
+| `record`
+| (optionally) the source of the Object Oriented Series 3a Record application.
+This is buildable, provided that the `\sibosdk\oop` directory has also been installed
+|===
+
+The SIBO SDK requires between 3 and 6 Megabytes of disk space, depending on how much of it is installed.
+
+==== Reconfiguring the TopSpeed project system
+
+The Sibosdk software contains files, including `tsprj.txt` and `tsmain.txt`, that are replacements for files of the same name released by TopSpeed.
+The Sibosdk versions of the files allow the TopSpeed project system to handle the EPOC IMG system type, and the Sibosdk tools generally, in addition to the systems normally supported by TopSpeed.
+(See <<_a_brief_overview_of_the_sibo_sdk,the following chapter>> for more details.)
+
+The Sibosdk versions should be copied, from `\sibosdk\sys`, over the TopSpeed versions in `\ts\sys` (as guided by `read.me`).
+Copies of the original TopSpeed files should be kept, with their extensions changed to `.old` (say).
+
+In case any specialised changes have already been applied to, say, your tsprj.txt and tsmain.txt files, you should re-apply these changes to the Sibosdk versions.
+
+In order for all these changes to have any effect, the TopSpeed tool `tscfg` has to be run:
+
+type `cd \ts\sys` to enter the appropriate directory type `tscfg` to invoke tscfg.
+
+Note that the replacement files are not the same as those supplied with versions of the SDK earlier than 2.0.
+You must therefore repeat the reconfiguration process, even if you are upgrading from a previous SDK version.
+
+==== Customising the redirection file
+
+The `\sibosdk\sys` directory contains the redirection file `ts.red` that allows the TopSpeed project system to find the SIBO SDK header files, library files, and other required files.
+When you invoke the project system to build an Epoc application it must be able to find this file.
+If there is no such file in the current directory, the TopSpeed system looks for this file in the directory containing the TopSpeed software itself (usually).
+So there are two options:
+
+* overwrite the TopSpeed `ts.red` file (in the directory) with the Psion `ts.red` file (in the `\sibosdk\sys` directory), and place a copy of the original TopSpeed `ts.red` file into the directory in which you are writing PC C applications (if any)
+* copy the Psion `ts.red` file into the directory in which you are writing a SIBO application.
+
+The first option is more appropriate if you are writing more SIBO applications than PC applications, the second if you are not.
+
+The contents of the default `ts.red` file is basically as listed below.
+Again, note that the supplied file is different from the `ts.red` in earlier versions of the SDK.
+
+.`ts.red`
+[%linenums,literal]
+....
+*.PR  = .; C:\SIBOSDK\PR;
+*.H   = .; C:\SIBOSDK\INCLUDE;
+*.HPP = .; C:\SIBOSDK\INCLUDE;
+*.RH  = .; C:\SIBOSDK\INCLUDE;
+*.G   = .; C:\SIBOSDK\INCLUDE;
+*.RG  = .; C:\SIBOSDK\INCLUDE;
+*.XG  = .; C:\SIBOSDK\INCLUDE;
+*.RSG = .; C:\SIBOSDK\INCLUDE;
+*.INC = .; C:\SIBOSDK\INCLUDE;
+*.C   = .; C:\SIBOSDK\SRC;
+*.CPP = .; C:\SIBOSDK\SRC;
+*.CAT = .; C:\SIBOSDK\SRC;
+*.A   = .; C:\SIBOSDK\SRC;
+*.OBJ = .; C:\SIBOSDK\LIB;
+*.LIB = .; C:\SIBOSDK\LIB;
+*.HLP = C:\TS\DOC;
+....
+
+For example, the meaning of the line
+
+[%linenums,literal]
+....
+*.H   = .; C:\SIBOSDK\INCLUDE;
+....
+
+is that any `.h` file referenced in the course of building an application should be searched for first in the current directory, then in the `c:\sibosdk\include` directory.
+
+To increase the search path for `.h` files, so that private `.h` files can be located from some other directory, just edit the `ts.red` file so that the line becomes, for example:
+
+[%linenums,literal]
+....
+*.H   = .; ..\INCLUDE; C:\SIBOSDK\INCLUDE
+....
+
+Note that the contents of this file assume that you have installed the Sibosdk system on your C: drive.
+If you have installed it on another drive you will have to edit `ts.red` to refer to the appropriate drive.
+

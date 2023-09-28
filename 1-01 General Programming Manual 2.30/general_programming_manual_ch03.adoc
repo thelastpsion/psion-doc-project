@@ -1,0 +1,931 @@
+
+== BUILDING AN APPLICATION
+
+=== Introduction
+
+The end result of developing a program to run on a SIBO computer is normally an image program, with characteristic extension `.img`.
+Essentially, `.img` files are to Epoc what `.exe` files are to MS-DOS.
+(Sometimes, the image file is given the extension `.app` instead.
+See later for the distinction between `.img` and `.app` forms of images.)
+
+Image files are actually produced via an intermediary `.exe` file by the operation of a tool `emake.exe`, though in practice this process is automated on behalf of the developer.
+The point is that the development cycle for `.img` files is basically the same as for `.exe` files in more traditional programming environments.
+The same compile-link-debug cycle exists in both cases.
+
+The program is written, compiled, and linked on the PC.
+These steps involve the TopSpeed compiler and linker, and TopSpeed _project_ (`.pr`) files.
+These steps may also involve the full TopSpeed _ts_ development environment, which is an Integrated Development Environment (IDE).
+Alternatively, developers may prefer a more traditional approach, involving their own favoured stand-alone text editor, and a batch-file mechanism for invoking the TopSpeed compiler and linker.
+
+Once linked, the program is transferred to the SIBO computer in one of three ways:
+
+* under the control of the SIBO Debugger
+* via a SSD written to by a PC SSD drive and then placed into the SIBO computer
+* via a serial link, using Comms software such as MCLink.
+
+A program running on a SIBO computer (though not one in its rom) can be debugged under the control of the SIBO Debugger running on a PC.
+If the program has been built under special conditions, source level debugging will be available; otherwise just machine-code level debugging.
+
+The remainder of this chapter gives more details on all the above points:
+
+* it introduces some particularly relevant aspects of the TopSpeed project file system
+* it describes some batch files that may be found useful when building applications
+* several example applications demonstrate the points made (all the example applications and associated files referred to in this chapter are optionally copied into `\sibosdk\demo` when the SDK is installed)
+
+==== Equipment required
+
+The following equipment is required in order to create an application that runs on a SIBO computer:
+
+- One target SIBO computer (HC, MC, or Series3)
+- One PC
+- The TopSpeed C development system on the PC
+- The Psion SIBO SDK software on the PC
+- One or other form of communication between the HC and the PC.
+
+Around 5 to 7 Mbytes of PC hard disk is required to install the TopSpeed C development system and the Psion SIBO SDK software.
+There is no particular requirement for the PC to have extended memory.
+Development can take place on an XT, but a 486 machine with around 4 Mbytes of extended memory machine will obviously produce results more quickly.
+
+==== Which files are needed
+
+To build an application, the following files are required:
+
+* source files, such as `.c` and `.h` files
+* a project file, with extension `.pr`
+* a redirection file, with name `ts.red`
+* libraries, with extension `.lib`.
+
+At the same time, various batch files (extension `.bat`) may be found useful.
+
+Additional files may be required for the development of applications with the aid of the Object Oriented system -- see the _Object Oriented Programming Guide_ for further details.
+
+There is no need to have a separate project file or redirection file for every single application.
+For example, ordinarily there will only be one redirection file on any one PC, shared between all applications written on that PC.
+One possible exception is in the case of developers who use the TopSpeed system to write PC programs as well as SIBO programs.
+
+=== A first example application
+
+The following discussion centres around a very simple "Hello World" program.
+The source C code is as follows:
+
+[source,c]
+----
+/*
+HELLO.C
+
+CLIB Hello World application
+*/
+
+#include <stdio.h>
+
+int main(VOID)
+    {
+    printf("Hello World");
+    getchar();
+    return(0);
+    }
+----
+
+Evidently, the program prints the message Hello World onto the screen, waits for the kbd:[Enter] key to be pressed, and then terminates.
+
+==== A first look at project files
+
+Before `hello.c` can be compiled and linked, a project file needs to be specified.
+In this case, the following (`hello.pr`) suffices:
+
+[code]
+----
+#system epoc img
+#model small jpi
+#compile hello
+#link hello
+----
+
+The meanings of the last two lines of this file are obvious enough: the file `hello.c` should be compiled, and then the resultant object file linked to create `hello.img`.
+Note that in any case of ambiguity, the extension `.c` should be added to the name specified in the `#compile` statement.
+
+The first two lines in `hello.pr` are less obvious.
+Their meanings are as follows:
+
+`#system epoc img` The end outcome of the build is a `.img` file, as defined in the EPOC-customised part of the TopSpeed configuration (alternative ``#system``s include dos and win) `#model small jpi`.
+The code is to be compiled in small model (code and data segments each restricted to 64K), with the JPI (TopSpeed C) convention of using registers to pass parameters to subroutines.
+
+These two lines must be present in all project files used to build applications for SIBO computers.
+Other possible contents of `.pr` project files are discussed later in this chapter.
+
+==== Creating the `.img` file
+
+There are two ways a `.pr` file can be used to create a `.img` program:
+
+* _inside_ the TopSpeed ts programming environment (see TopSpeed documentation for full details)
+* _outside_ the _ts_ environment.
+
+For example, one reason for working _outside_ the _ts_ environment would be to allow the use of another text editor, such as _Brief_.
+
+The remainder of this programming manual describes use of `.pr` files outside of the ts environment.
+For the moment, simply type:
+
+[source,batchfile]
+----
+tsc /m hello
+----
+
+to have `hello.c` compiled and linked, with the end result (among other
+files) being `hello.img`.
+
+The significance of the `/m` parameter is that the project file is executed in "make" mode, with files not being recompiled or relinked
+needlessly.
+
+==== Copying the program to the target machine
+
+If your PC has a set of SSD drives attached, simply copy `hello.img` onto an SSD in one of these drives, and then insert the SSD into the
+target machine (the SIBO computer).
+Otherwise, you may wish to use MCLink as follows:
+
+* connect the SIBO computer to your PC using a suitable cable
+* run the Link application on the target machine (type `link` at the HC command line, click on the Link icon on an MC, or set Remote Link on in the System Screen of a Series3)
+* run MCLink on the PC (eg by typing `MCLINK` if `\sibosdk\sys` is on your path)
+* adjust the MCLink serial port and baud rate parameters if required
+* type `copy hello.img rem::m:\hello.img` to transfer the program to the `m:` drive of the remote machine (or copy the file to `rem::m:\img\hello.img` on a Series3)
+
+For more details about the MCLink program, see the chapter _Mclink, Mcprint, and Slink_ in the _Additional System Information_ manual.
+(For example, that chapter explains how the whole process of running MCLink can be handled via time-saving batch files at the PC end of the connection.)
+Finally, another way the program can be transferred from the PC to the target computer is by using the SIBO Debugger, as discussed below.
+
+==== Running the program on the target computer
+
+The way the program is run on the target computer varies from computer to computer:
+
+* on an HC, simply type `hello` at the `$` prompt of the Command Shell
+* on an MC, use the *Run* menu command of the System application, and select `hello.img`
+* on a Series 3 or Series 3a, the entry _Hello_ will appear in the file list of the RunImg application when this list is next updated (assuming that `hello.img` has been copied into a `\img\` top-level directory), so that `hello.img` can be run simply by positioning the highlight over Hello and pressing ENTER.
+
+==== Stepping through the program with the SIBO Debugger
+
+In order to debug a program, there is no special need to copy it "by hand" onto the target machine.
+Just type
+
+[source,batchfile]
+----
+\sibosdk\sys\sdbg hello
+----
+
+(or equivalent) at the PC end, and ensure Link is running on the target computer.
+(These instructions assume that `hello.img` is in the current directory on the PC.)
+In due course, the debugging screen will appear on the PC.
+(When debugging a program running on an MC, the baud rate for the Debugger to use may have to be given explicitly -- eg `\sibosdk\sys\sdbg -b19200 hello`.)
+
+Step through the program (use kbd:[F8] or kbd:[Alt+S] until it hangs (waiting for a key to be pressed on the target computer).
+Or simply run the program to completion (use kbd:[F9] or kbd:[Alt+R]).
+
+In fact, if `hello.img` has been built as specified above, the debugging screen will come up in machine code level.
+In order to debug at the source code level, a slight change has to be made in the way `hello.img` is built:
+
+* either a line `#pragma debug(vid=>full)` has to be inserted in the project file (before any instruction to `#compile`)
+* alternatively, a parameter `/v2` can be added to the command line invoking the project file.
+
+Thus typing
+
+[source,batchfile]
+----
+tsc /m hello /v2
+----
+
+at the PC command line builds a version of hello.img suitable for source level debugging.
+
+As before, just type
+
+[source,batchfile]
+----
+\sibosdk\sys\sdbg hello
+----
+
+but this time, the debugging screen by default starts in source level mode, and supports inspection of variables, etc.
+See the SIBO Debugger manual for more details.
+
+=== A PLIB version of Hello World
+
+==== PLIB and CLIB contrasted
+
+The above "Hello World" program uses the so-called _CLIB library_.
+
+CLIB is a version of the TopSpeed C library for the EPOC operating system.
+As such, it is a version of the standard ANSI C library.
+The functions in CLIB are described in the _TopSpeed C Library Reference_ manual.
+Additional notes, including a list of the TopSpeed C library functions that are not implemented, may be found in the following chapter, _Notes on CLIB_.
+
+The EPOC version of the TopSpeed C library supports the ANSI functions and most of the portable functions that are commonly supported by MS-DOS C libraries such as Microsoft C and Borland’s Turbo C.
+The less portable functions such as those that access the BIOS and graphics functions are not included.
+
+The benefits of using CLIB are:
+
+* portability (existing C programs can easily be converted)
+* less to learn for programmers already familiar with standard C libraries.
+
+However, for many programs, developers are strongly urged to consider using not _CLIB_ but _PLIB_ -- Psion’s proprietary C library.
+Whilst PLIB differs from the ANSI standard in many places, there are good reasons for all these differences, so as to best take advantage of the Epoc
+architecture.
+In particular:
+
+* many of the ROM-based EPOC system services are not available from CLIB (eg asynchronous I/O, inter-process messaging, the window server graphics functions)
+* executables are larger in CLIB and the process takes a larger data segment.
+
+The executables are larger because, although CLIB uses the ROM-based system services wherever possible, it is still a much "thicker" library than PLIB.
+The data segments also tend to be larger because the various CLIB subsystems typically require large static buffers and tables.
+
+See the _Introduction_ chapter of the _PLIB Reference_ manual for more details.
+
+In fact, unless you are using the in-built user interface object dynamic libraries (accessed using object-oriented programming), you can freely mix PLIB calls with CLIB.
+Experienced C programmers can, if they wish, initially use the more familiar CLIB functions and regard PLIB and WLIB (the window server library) as they would regard non-portable components of any C library.
+
+It is worth converting completely to PLIB and WLIB when the desirability of making efficient use of memory outweighs the benefits of portability and familiarity.
+
+==== The code for p_hello.c
+
+The code for a PLIB version of the above program `hello.c` is contained in the file `p_hello.c`:
+
+[source,c]
+----
+/*
+P_HELLO.C
+
+PLIB Hello World application
+*/
+
+#include <plib.h>
+
+GLDEF_C INT main(VOID)
+    {
+    p_printf("Hello World");
+    p_getch();
+    return(0);
+    }
+----
+
+and a corresponding project file `p_hello.pr` would be
+
+[source]
+----
+#system epoc img
+#set epocinit=iplib
+#model small jpi
+#compile p_hello
+#link p_hello
+----
+
+The following differences will be noticed between `hello` and `p_hello`:
+
+* the PLIB program uses a Psion-proprietary header file (`plib.h` in this case)
+* the PLIB program uses Psion-proprietary function calls (`p_xxx` functions)
+* the PLIB program links with a different library (this is one effect of the epocinit line in the project file -- discussed further below).
+
+To build `p_hello.img`, just type either `tsc /m p_hello` or `tsc /m p_hello /v2` (the latter producing a version supporting source-code debugging).
+
+As a result of the differences between `hello` and `p_hello`, a
+substantially smaller `.img` file is produced (try it and see).
+
+The reason for the remarkable codesize improvement of the PLIB program is that, as mentioned earlier, the functions in the PLIB library provide only _very thin shells_ over functionality that is present in the ROM of the SIBO computer.
+PLIB programs make better use of the SIBO ROM software than do CLIB programs.
+Being tailored to the particular needs of SIBO computers, PLIB evolved with very different constraints and objectives from standard C libraries.
+In many cases, PLIB functions can be claimed to "improve" upon the specification of their nearest CLIB equivalents.
+
+The difference in size between CLIB and PLIB programs is not always so remarkable as in the above example -- it depends on the number and types of library function calls made.
+Indeed, it is perfectly possible to write some parts of an application using CLIB, and others in PLIB.
+This fact considerably simplifies any process of converting a previous large programming project from one computer system to the SIBO SDK system.
+
+Whilst it is possible to avoid PLIB entirely, this is not recommended.
+Time spent gaining familiarity with the functions in the PLIB library should prove an excellent investment, aiding the production of leaner and more powerful applications.
+In any case, familiarity with PLIB is a pre-requisite for accessing many other parts of the SIBO ROM software -- such as the enhanced graphics facilities of the Window Server.
+
+==== The `epocinit` statement in `.pr` files
+
+In `p_hello.pr`, the command
+
+[source]
+----
+#set epocinit=iplib
+----
+
+sets the value of the project macro `%epocinit`.
+Note that this command must precede the `#model` command in any `.pr` file.
+
+This command serves two purposes: it specifies whether you are using the CLIB or PLIB startup object files, and it specifies the stack size for the `.img` file produced.
+The allowed values of `%epocinit` are:
+
+[cols="1,4"]
+|===
+|`iclib`
+|CLIB startup, 8k stack (recommended size when using CLIB startup)
+
+|`iclib4`
+| CLIB startup, 4k stack
+
+|`iclib2`
+|CLIB startup, 2k stack
+
+|`iplib`
+|PLIB startup, 4k stack (recommended size when using PLIB startup)
+
+|`iplib8`
+|PLIB startup, 8k stack
+
+|`iplib2`
+|PLIB startup, 2k stack
+|===
+
+If `%epocinit` is not set then it defaults to `iclib` (as in
+`hello.pr`).
+
+You must use the CLIB startup object files if you are writing a program that includes any CLIB library I/O functions.
+It is, however, possible to use many CLIB library functions (for example, the memory allocation functions) in conjunction with the PLIB startup.
+If you do not use any CLIB library functions then you should always use the PLIB startup.
+
+See the _Introduction_ chapter in the _PLIB Reference_ manual for more about startup object files.
+
+=== Housekeeping batch files and re-using project files
+
+==== A general project file: `unnamed.pr`
+
+Clearly, a project file such as `p_hello.pr` can be used, with only nominal changes, for a wide range of other similar programs.
+
+Consider the related project file, `unnamed.pr`:
+
+[source]
+----
+#system epoc img
+#set epocinit=iplib
+#model small jpi
+#compile %main
+#link %main
+----
+
+in which the only difference from `p_hello.pr` is that references to `p_hello` have changed into `%main`.
+Any batch file that invokes `unnamed.pr` has to set the value of `%main` as a parameter to `tsc`.
+For example,
+
+[source,batchfile]
+----
+tsc /m unnamed.pr /smain=%1
+----
+
+with the TopSpeed `/s` construct being used to set the value of `%main` to the variable passed into the batch file.
+
+==== A batch file for test compilation
+
+A programmers’ text editor usually has some means to compile or "test compile" a source file, from inside the editor.
+Many programmers find this a considerable boost to productivity.
+
+For example, _Brief_ supports compilation on the kbd:[Alt+F10] hot key, with the way the compilation is done being determined by an MS-DOS environment variable:
+
+* during `autoexec.bat` (or a batch file called therein), set the value of `bcc`, eg to `!"cc.bat %s"`
+* the effect of kbd:[Alt+F10] while editing a `.c` file would then be to run the batch file `cc.bat`, passing the basic name of the file (ie less the path and extension) into the batch file
+* the leading exclamation mark specifies that compiler warnings should be reported, as well as errors.
+
+The TopSpeed `ts` integrated development environment naturally possesses an equivalent mechanism, but some users may prefer to use an independent text editor.
+
+Accordingly, one suggestion is that there should be a file `cc.bat` in the local directory (or in the path), with the following contents (or equivalent):
+
+[source,batchfile]
+----
+tsc %1.c /fpunnamed
+----
+
+The meaning of the `/fp` construct is that the specified project file should be used (in this case, `unnamed.pr`).
+
+Given that there is no `/m` in this command (nor any `/l`), the specified project file is invoked in so-called "compile" mode: nominated files are compiled, without any files being linked.
+Further, the compilation _always_ takes place, without any calculation of whether an object file is already "up-to-date".
+
+Once all the required C source files in a project have been successfully compiled, the programmer can exit the editor, and then "make" the project in the normal way:
+
+* no time will be wasted in recompiling files unnecessarily
+* a `.img` file will be produced (if the make is successful).
+
+The cc.bat file used for test compilation could be accompanied by a `make.bat` file that invokes the project file in "make" mode.
+
+==== Some complications
+
+There are a couple of shortcomings with the above batch file cc.bat:
+
+* it takes no account of whether files should be compiled with full debug information
+* it takes no account of a possible specialised `.pr` file: the project file `unnamed.pr` is hard-wired.
+
+It does not take too much imagination to come up with a more general scheme -- as is embodied in the batch files `cc.bat` and `make.bat` actually shipped with the demo files `p_hello.c` etc:
+
+* a test should be made for the existence of a project file with name `%1.pr`
+* attention should be paid to the value of an environment variable for whether to generate full debugging information.
+
+The batch files supplied assume that the required debug status is stored in an environment variable `%jpivid%`.
+This should have one of the values `v2` (for full debug information) or v0 (for no debug information).
+However, `cc.bat` and `make.bat` each call a subsidiary batch file, `checkvid.bat`, which ensures that `%jpivid%` does indeed exist and has one of these values.
+
+The value of %jpivid% is itself expected to be set up by calling the final batch file in the suite: `vid.bat`.
+Typing
+
+[source,batchfile]
+----
+vid on
+----
+
+at the MS-DOS command line has the effect of setting %jpivid% to `v2`, whereas typing
+
+[source,batchfile]
+----
+vid off
+----
+
+sets `%jpivid%` to `v0`.
+Typing `vid` by itself echoes the current vid setting.
+
+The contents of these four batch files are as follows:
+
+.vid.bat
+[source,batchfile]
+----
+@echo off
+goto X%1X
+:Xv0X
+:XoffX
+set jpivid=v0
+echo VID is now OFF
+goto :end
+:Xv2X
+:XonX
+set jpivid=v2
+echo VID is now ON
+goto :end
+:XX
+call checkvid
+goto %jpivid%
+:v0
+echo VID is OFF
+goto end
+:v2
+echo VID is ON
+:end
+----
+
+.checkvid.bat
+[source,batchfile]
+----
+@if not "%jpivid%"=="v2" set jpivid=v0
+----
+
+.cc.bat
+[source,batchfile]
+----
+@echo off
+call checkvid
+if exist %1.pr goto custom
+tsc %1.c /fpunnamed /%jpivid%
+goto end
+:custom
+tsc %1.c /fp%1 /%jpivid%
+:end
+(make.bat:)
+@echo off
+call checkvid
+if exist %1.pr goto custom
+tsc /m unnamed.pr /smain=%1 /%jpivid%
+goto end
+:custom
+tsc /m %1.pr /smain=%1 /%jpivid%
+:end
+----
+
+Naturally, there is considerable scope for further personalisation and enhancement of these batch files, if desired.
+
+One final refinement would be to use the MS-DOS prompt command to change the prompt to reflect the current value of `vid`.
+For example,
+
+[source,batchfile]
+----
+prompt $p_%jpivid%$g
+----
+
+(The reason it is generally important to keep track of whether full debugging information is being generated is that significantly larger `.img` programs can result in this case.)
+
+==== TSC versus TSCX
+
+All the examples of compiling and linking that have been given so far use the TopSpeed `tsc` command.
+This command does not make use of expanded memory and may cause problems, particularly when linking large applications.
+
+Most of the batch files supplied with the SDK to compile, link or make executables use the `tsc` version.
+If this causes difficulties on your PC, you may find that replacing `tsc` with `tscx` (which uses expanded memory) in these batch files will cure the problem.
+
+=== More complicated programming setups
+
+The remainder of this chapter makes no mention of programming technique or programming _concepts_ within the SIBO SDK system (see the later chapter _Fundamental Programming Guidelines_ for that).
+Rather, it continues to explain more details of the mechanics of building applications of various sorts.
+
+==== Simple PLIB examples
+
+The following four programs all use the default project file, `unnamed.pr`, and each consist of only one source module:
+
+[cols="1,4"]
+|===
+|`p_search`
+|searches a specified text file for a given piece of text
+
+|`p_prndir`
+|prints specified directory listings to the screen
+
+|`p_dlist`
+|lists all current "devices" (ie local and remote disk drives)
+
+|`p_comp`
+|compares two specified files, to see if they match.
+|===
+
+For example, to build a version of `p_dlist.img` suitable for source-level debugging, just type
+
+[source,batchfile]
+----
+vid on
+make p_dlist
+----
+
+To exit any of these programs which repeatedly request user input, simply press ENTER on an empty input line.
+
+Note: these programs are all restricted to so-called console i/o:
+
+* no attractive graphics
+* limited support for the user editing data entered previously.
+
+Additionally, they pay no attention to the actual size of the screen on individual SIBO computers.
+Whilst the data they display fits well enough on the large screen of MC computers, the display is less suited to the smaller screens of HC or Series3 computers.
+Simple modifications can make amends in this last regard.
+But for enhanced graphics output, use of Window Server functions is needed.
+
+Finally, these programs are all _single-threaded_, ie each has only one event source (the keyboard).
+At the same time, they contain no asynchronous i/o.
+(The vital topics of _multi-threaded_ programming and asynchronous i/o are two of the central themes of the chapter _Fundamental Programming Guidelines_.)
+
+But despite their limitations, these four programs will hopefully be found useful for the purpose of acquiring familiarity with `.pr` project files and with the SIBO SDK system generally.
+There is no need to worry unduly over their detailed content; however, taking the time to build them and then improve them could well turn out a very rewarding exercise (eg in making the transition from CLIB to PLIB).
+
+==== Multi-file programs
+
+For a program with more than one source file, the corresponding `.pr` needs but a slight modification.
+For example, suppose a program triple has three source files: `triple.c` itself, `utils1.c` and `utils2.c`.
+A suitable project file `triple.pr` would be
+
+[source]
+----
+#system epoc img
+#set epocinit=iplib
+#model small jpi
+#compile triple
+#compile utils1
+#compile utils2
+#link triple
+----
+
+The effect of the final `#link` statement is actually as follows:
+
+* link together all the files listed with `#compile` statements
+* link also the relevant startup module and standard libraries
+* link also any object files or libraries specified by any `#pragma` link statements (see below for examples)
+* give the final executable the name specified in the `#link` statement.
+
+Note in particular there is no need for the name specified by the `#link` statement to match the name of the `.pr` file, nor the name of any of the individual files linked together.
+
+==== Graphics programs
+
+Programs which interact directly with the Window Server can produce a large variety of impressive graphics effects -- icons and bitmaps, shapes and areas, mixed fonts and styles, scrolling and animation, information messages and alerts, and so on.
+
+These programs can operate with `.pr` files of exactly the same form as described earlier in this chapter.
+For example, the file `unnamed.pr` can continue to be used, unchanged, for any simple single-module Window Server program.
+Parts of the Window Server library, `wlib.lib`, are automatically linked in as required, without any change being required in the `.pr` file: there is no need to ask for `wlib.lib` explicitly.
+The source modules will, of course, have to change in the following aspects:
+
+* calls to Window Server functions `gXXX` or `wXXX` will be included
+* the Window Server header file `wlib.h` will have to be ``#include``d.
+
+For more details, including some introductory Window Server programs of the "Hello World" variety, see the _Window Server Reference_ manual.
+
+==== HWIF programs
+
+Developers writing for the Series3 can take advantage of the additional menu and dialog functionality (amongst other features) of the HWIF library, to create applications very similar to those built into the ROM of the Series3.
+
+See the _Programming in HWIF_ manual for full details, including a suite of example programs.
+
+Project files for these programs need to include the line
+
+[source]
+----
+#pragma link(hwif.lib)
+----
+
+since the HWIF library is not one of those that are automatically searched at link time.
+
+==== Customised libraries
+
+Developers may wish to collect various utility routines, or other subsets of code, into their own libraries, which can in due course be linked into different programs.
+Possibly, developers may wish to distribute their libraries in object form (`.lib` files), and not in source form.
+In such a case, there is likely to be at least two different `.pr` files: one controlling the creation of the `.lib` file, and one that, later, joins the `.lib` file into a required application program.
+
+For example, suppose that modules `utils1.c` and `utils2.c` are to be compiled and linked into a library called `utils.lib`.
+This can be accomplished by means of the following project file:
+
+[source]
+----
+#system epoc img
+#set epocinit=iplib
+#model small jpi
+#compile utils1
+#compile utils2
+#dolink utils.lib
+----
+
+Note the following points:
+
+* the command `#dolink` is used rather than `#link`, to stop the TopSpeed system attempting to link in a startup object too (not to mention other standard libraries)
+* the extension `.lib` explicitly given overrides the default `.img` that would otherwise be assumed on account of the statement `#system epoc img`.
+
+A project file to produce an application tutils, say, that made use of functionality in utils.lib, could then be as follows:
+
+[source]
+----
+#system epoc img
+#set epocinit=iplib
+#model small jpi
+#compile tutils
+#pragma link(utils.lib)
+#link tutils
+----
+
+with `utils.lib` being searched for along the path specified in the
+redirection file `ts.red`.
+
+==== Applications containing assembler as well as C
+
+In principle, it is perfectly possible for an application to include
+assembler source modules, as well as modules written in C.
+
+For example, if an application contains two source files, `cfile.c`
+written in C and `afile.a` written in assembler, the following could
+appear in the project file:
+
+[source]
+----
+#compile cfile
+#compile afile
+----
+
+The TopSpeed system will automatically run the appropriate "compiler"
+for each specified type of file -- ie compiling the `.c` file and
+assembling the `.a` file.
+
+However, programmers should note that there are various rules that must be adhered to in writing assembler modules for Epoc programs.
+See the _Introduction_ chapter of the _PLIB Reference_ manual in the first instance.
+
+NOTE: the TopSpeed system will give an error message, and terminate, if there are two possible files each candidates as the source for of a
+`#compile` statement -- for example, if the files `cfile.a` and `cfile.c` both exist in a directory.
+As another example, if a directory contains files `query.c` and `query.rc`, the statement `#compile` query will again result in an error -- since the TopSpeed system regards the `.rc` file as a possible source file too.
+All these cases can be circumvented by giving the extension explicitly in the `#command` statement -- eg `#compile query.c`.
+
+==== Other advanced use of the project file system
+
+The TopSpeed documentation describes many possible ways to exercise further control over the process of building program files.
+
+One general piece of advice should, however, be borne in mind: while learning to program within the SIBO SDK system, please accept the default configuration proposed by Psion.
+Only attempt to refine this configuration once your program is already clearly working.
+Otherwise, it may prove difficult to determine whether some unexpected program behaviour is due to a coding mistake, or to some unexpected side-effect of a proposed "optimisation" of the build configuration.
+
+In any case, optimisations resulting from careful choices of PLIB or WLIB (etc) functions, are likely to prove more significant than any that can easily be achieved by tweaking the SIBO version of the TopSpeed build configuration.
+
+It is also generally a bad idea to ignore warnings from the compiler and linker (except where explicitly mentioned in the SDK manuals).
+Rather than discounting these warnings as "quirks" of the system, they should all be analysed and dealt with.
+In particular, don’t be too hasty to disable "inconvenient" compiler warnings.
+
+Note that the SIBO SDK build configuration is actually defined in two different parts:
+
+* in the file `tsprj.txt` which has to be "compiled" (using `tscfg`) before being used
+* in the file `stdepoc.h` which is always the first include file in any source module.
+
+As mentioned in the chapter on _Installation_, the file `tsprj.txt` released as part of the SIBO SDK modifies and extends the one released by Clarion themselves, by adding in details specific to the SIBO SDK system.
+
+=== Greater control over the image file created
+
+This section explains some of the SIBO add-ons to the TopSpeed project file build system.
+It also covers standalone use of the tools `edump.exe`, `emake.exe` and `eremake.exe`:
+
+* `edump.exe` provides key information about the contents of an image file
+* `emake.exe` is the underlying tool which creates image files
+* `eremake.exe` can be used to alter some of the "additional" contents of image files.
+
+==== Priority, minimum heap, and version number
+
+Three project file variables can be used to override various defaults otherwise used when a `.img` file is created:
+
+* `%version` sets the version number of the `.img` file, which otherwise defaults to 0x100f
+* `%priority` sets the initial priority of the program, which otherwise defaults to 0x80
+* `%heapsize` sets the initial and minimum heap of the application, which otherwise defaults to `0x80`.
+
+The application version number can be read by various pieces of software, for example the Application Info command of the System application on MC computers.
+For more about legal version numbers, see the section on `p_version` in the _PLIB Reference_ manual.
+
+The initial process priority may occasionally need to be specified explicitly, eg for an application that is part of a suite of cooperating applications.
+See the section on `p_setpri` in the _PLIB Reference_ manual and also the section Priority changing in the chapter _General Window Server Functions_ in the _Window Server Reference_ manual.
+
+The value of `%heapsize` is the one that applications are most likely to wish to alter, since this has significance for error handling (see the chapter _Fundamental Programming Guidelines_ later in this manual):
+
+* the value of `%heapsize` is in paragraphs, eg `0x80` means `0x800` bytes ie 2 Kbytes
+* the operating system will refuse to start an instance of the application if this amount of free heap space cannot be found for it
+* once started, the application will never have its heap shrunk below this value.
+
+The default values for these variables can be overridden in either of two ways:
+
+* a line such as `#set heapsize=0x180` can be added into the project file
+* the parameter `/sheapsize=0x180` can be added to the end of the `tsc` command invoking the project file (this is evidently the same syntax as in the `/smain=%1` in the supplied batch file `make.bat`).
+
+==== Use of `edump.exe`
+
+The tool `edump.exe` can be used to verify the values of the above three variables (amongst others) for a specified `.img` file.
+For example, typing `edump p_hello` results in output such as
+
+....
+EDump V2.02F (03/10/90) Copyright (C) Psion PLC 1989
+LOC::D:\SIBOSDK\DEMO\P_HELLO.IMG IMAGE file data
+Image version      = 200F
+Code Segment       = 01D0 (bytes)
+Initial IP         = 0000
+Stack              = 1000 (bytes)
+Data               = 0040 (bytes)
+Heap               = 0800 (bytes)
+Data Segment       = 1840 (bytes)
+Initialized data   = 0030 (bytes)
+Code checksum      = DA14
+Data checksum      = 0BF7
+Code Version       = 100F
+Priority           = 0080
+Header size        = 0040 (bytes)
+Dyl count          = 0000
+Dyl table offset   = 00000000
+Image file size    = 00000240 (bytes)
+....
+
+where the default values of "Heap", "Code version", and "Priority" can all be seen.
+
+Deleting `p_hello.img` and rebuilding it via the command
+
+[,console]
+----
+tsc /m p_hello /sversion=0x110b
+----
+
+before running `edump` again yields identical output, except that the
+"Code version" line changes.
+
+==== Differences between `.app` files and `.img` files
+
+Strictly speaking, there is no real difference between image files with extension `.img` and those with extension `.app`.
+For example, although the System applications on the MC and on the Series 3 usually expect to install `.app` files, they will also, if requested, install suitable `.img` files.
+
+However, by convention a `.app` file contains one or more extra so-called _add-files_ embedded within it, in addition to the core `.img` file itself.
+These files may include:
+
+* a `.pic` file providing the icon for the application
+* a `.rsc` or `.rzc` file providing the resource file for the application
+* a `.shd` file providing the shell data for the application (only for Series3 applications).
+
+As such, a `.app` file is simply a `.img` file which has some associated files conveniently built into it.
+A significant advantage of a `.app` file is that a user cannot inadvertently sabotage the operation of the program by copying the `.img` file itself from one drive to another, but neglecting to copy one of the associated files.
+
+Add-files can be added into the `.img` file automatically, via the operation of `emake.exe`, at the time the `.img` file is itself created.
+What controls the set of add-files used (if any) is the presence or absence of a suitably named _add-file list_ (`.afl`) file.
+
+==== Add-file lists
+
+An add-file list (`.afl`) file is a text file containing from one to four filenames.
+For example, the contents of a file `tele.afl` could be:
+
+[source]
+----
+tele.pic
+tele.rsc
+tele.shd
+----
+
+When any `.pr` project file is invoked that leads to the building of `tele.img`, the existence of a file `tele.afl` is checked for.
+If such a file is found, the files listed therein are combined with the core `.img` file to form a larger `.img` file as output.
+By convention, `.img` files that contain embedded add-files are renamed to `.app` files (though no such renaming takes place automatically).
+
+The inclusion of these embedded files can be confirmed by running the tool `edump.exe` as follows.
+Typing `edump tele.app` might yield
+
+[source]
+----
+EDump V2.02F (03/10/90) Copyright (C) Psion PLC 1989
+LOC::E:\SIBOSDK\HWDEMO\TELE.APP IMAGE file data
+Image version      = 200F
+Code Segment       = 1ED0 (bytes)
+Initial IP         = 0000
+Stack              = 1000 (bytes)
+Data               = 0690 (bytes)
+Hea                = 0800 (bytes)
+Data Segment       = 1E90 (bytes)
+Initialized data   = 03C0 (bytes)
+Code checksum      = 33DF
+Data checksum      = 3033
+Code Version       = 100F
+Priority           = 0080
+Header size        = 00F0 (bytes)
+Add 1 offset,len   = 0040 (bytes), 0074 (bytes)
+Add 2 offset,len   = 00C0 (bytes), 0000 (bytes)
+Add 3 offset,len   = 00C0 (bytes), 002E (bytes)
+Dyl count          = 0000
+Dyl table offset   = 00000000
+Image file size    = 00002380 (bytes)
+----
+
+For the moment, the interesting data here is contained in the three lines of the form:
+
+[source]
+----
+Add n offset,len
+----
+
+These give the offsets within the combined `.app` file to the embedded add-files.
+In this case, three of the add-file slots are used; in general, any number from zero to four could be used.
+
+For more discussion about various possible add-files, see the _Series 3/3a Programming Guide_.
+
+A similar technique, using a DYL file list in a file with a `.dfl` extension, may be used to build any number of dynamic library (DYL) files into an application.
+This topic is described in more detail in the _Object Oriented Programming Guide_.
+
+==== Changing the set of add-files in an image
+
+The tool `eremake.exe` can be used to change the set of add-files built into an image file, without needing to run the TopSpeed project system again, and without needing to have any files to hand apart from the original image file.
+That is, image files can be remade with new add-file contents, without the earlier `.exe`, `.obj`, or `.c` files being present.
+
+One common use of `eremake` is to convert eg an English language version of an application into a specified alternative language version.
+See the chapter Resource Files in the Additional System Information manual for a general discussion of applications that can run in more than one language.
+For example, suppose that an application Query has all its language text isolated in a resource file `query.rzc`, which is one of the original add-files for the application.
+More precisely, suppose that the original contents of `query.afl` are
+
+[source]
+----
+query.pic
+query.rzc
+query.shd
+----
+
+Suppose further that a French version of the resource file is produced: `frquery.rzc`, say.
+Then a new `.afl` list should be created, `frquery.afl` say:
+
+[source]
+----
+query.pic
+frquery.rzc
+query.shd
+----
+
+and `eremake.exe` should be invoked as follows:
+
+[source,batchfile]
+----
+eremake -afrquery -o..\french\query.app query.app
+----
+
+For a full list of possible parameters to `eremake.exe`, simply type `eremake` by itself.
+Note that `eremake.exe` can be used to alter the priority, minimum heap, or version number of an image file.
+
+In the above case, the "output" file `..\french\query.app` is created by "remaking" `query.app` with add-files listed in `frquery.afl`.
+
+In this example, the files `query.pic` and `query.shd` from the original version are also used for the French version.
+Clearly, these could be changed too, if required.
+
+==== Further uses of `emake.exe`
+
+The actual conversion from `.exe` form into `.img` form is handled by the Psion-proprietary tool `emake.exe`, according to the command
+
+[source]
+----
+#run "emake -b %afl% -o%name% -s -v%version% -p%priority% -h%heapsize% -%epoctype% %name%.exe"
+----
+
+in the file `tsprj.txt`.
+
+For a full list of possible parameters to `emake.exe`, just type `emake` by itself.
+
+Note in particular that emake can produce other forms of final output, apart from `.img` files.
+This is determined by the `%epoctype` variable in the above command, which by default takes the value `t1`.
+Other possible values are `t2` through `t4`:
+
+[cols="1,4"]
+|===
+| `t1`
+| makes an image file, with characteristic extension `.img`
+
+| `t2` | makes a logical device
+driver, with characteristic extension `.ldd`
+
+| `t3` | makes a physical device driver, with characteristic extension `.pdd`
+
+| `t4` | makes a dynamic library, with characteristic extension `.dyl`
+|===
+
+Logical and physical device drivers are further discussed in the _Writing Device Drivers_ chapter in the _Additional System Information_ manual.
+Dynamic libraries are discussed in the _Object Oriented Programming_ chapter of the _PLIB Reference_ manual, and in the _Object Oriented Programming_ Guide.
+

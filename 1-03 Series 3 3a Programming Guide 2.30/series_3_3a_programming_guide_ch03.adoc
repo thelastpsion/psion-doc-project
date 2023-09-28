@@ -1,0 +1,346 @@
+== ENHANCED SOUND OUTPUT
+
+=== Introduction
+
+The Series 3 and Series 3a provide distinct sets of sound services.
+
+The Series 3 as supplied can emit only buzzer sounds, DTMF dialling tones, and simple alarm sounds.
+However, by loading a suitable device driver, such as `SNDFRC.LDD`, the machine can also be made to emit sequences of musical notes of variable duration, thus greatly extending its sound capabilities.
+The first section of this chapter describes use of the `SNDFRC.LDD` attached device driver from within a simple demonstration program.
+
+The Series 3a has considerably greater sound capabilities than the Series 3.
+In addition to emitting buzzer sounds, DTMF dialling tones and simple alarm sounds, the Series 3a can play simultaneously two sequences of musical notes, and can play and record digital sound files -- for details of playing and recording digital sound files see the _General System Services_ chapter of the _PLIB Reference_ manual.
+The second section of this chapter describes a simple program that demonstrates the playing of sequences of
+notes using the built-in `SND:` device driver.
+
+WARNING: Any attempt to load and use the SNDFRC.LDD attached device driver on the Series 3a is a serious error -- the machine will in all probability hang, necessitating a soft reset.
+
+=== Sound on the Series 3
+Introduction
+
+This section explains how to create a wider range of musical sound output, via the loudspeaker, than is possible by merely using the Series 3's built-in `SND:` device driver.
+
+These services rely on a dynamic extension to the Series 3 operating system, known as a _loadable device driver_.
+
+With this device driver installed, strings of sound covering two octaves in semitone intervals can be generated.
+Control is also possible over the duration and loudness of the notes emitted.
+
+==== The `sndfrc` and `snddvr` device drivers
+
+The chapter _Example Device Drivers_ in the _Additional System Information_ manual describes two different enhanced sound drivers, `sndfrc.ldd` and `snddvr.ldd`, from the point of view of how to write device drivers.
+The current chapter focuses on the question, not how to write these drivers, but how to use them.
+
+In fact, this chapter only considers the driver `sndfrc.ldd`, which is arguably the superior of the two.
+See _Example Device Drivers_ for a discussion on how the two device drivers differ.
+
+Once this device driver file has been installed, a device with the name `MUS:` can be opened by applications.
+
+==== Installing `sndfrc.ldd`
+
+Any program which wishes to use the services of `sndfrc.ldd` needs to check, during its initialisation, that this driver has been installed.
+This is necessary because, in contrast to some other device drivers such as the serial port device driver and the basic sound device driver, the `MUS:` device driver is not built into the ROM of the Series 3.
+
+The way to check the device driver is loaded is to make the call
+
+ p_loadldd("SNDFRC.LDD");
+
+where the full path of the `.ldd` file can be given.
+(The `.ldd` file has to be copied onto the Series 3.)
+
+The return values zero and `E_FILE_EXIST` can both happily be ignored.
+Other errors are more serious -- they probably mean that the file `sndfrc.ldd` cannot be located.
+In this case, the program cannot continue (at least, not as according to its original intention).
+
+==== Opening a channel to `MUS:`
+
+Another pre-requisite to using the services of `sndfrc.ldd` is to open a channel to `MUS:`.
+This is done in the standard manner for all i/o devices:
+
+ p_open(&handle,"MUS:",-1);
+
+If this call is successful, it writes back the handle of the channel established to the device driver.
+All subsequent requests from the program (until such time as the channel is closed) should be made via this handle.
+
+Possible errors from the p_open call include:
+
+* "invalid arguments" -- which probably means `sndfrc.ldd` has not been installed (or, having once been installed, it has since been de-installed)
+* "in use" or "locked" -- another application is currently making use of the loudspeaker.
+
+In the second of these two cases, a brief retry philosophy might be adopted.
+If the channel still cannot be opened, a suitable error message should be displayed -- leaving it up to the user to retry at some later time.
+
+==== Actually creating sounds
+
+The way sounds are actually caused to be emitted is by using the `P_FWRITE` service of the `MUS:` channel.
+
+As for all device drivers, the `P_FWRITE` request can be made synchronously (eg using the utility function `p_write`) or, for more quality applications, asynchronously.
+If the request is made asynchronously, it allows the use of the `P_FCANCEL` service to interrupt and terminate a sequence of notes as they are playing.
+
+For example,
+
+ p_ioc5(handle,P_FWRITE,&musstat,&buf[0],&len);
+
+to play a buffer of notes asynchronously.
+
+The parameter `len` (passed by reference) gives the number of notes in the buffer.
+The maximum allowed value of `len` is 500.
+(For arbitrarily long sequences of notes, call the `P_FWRITE` service more than once.)
+
+Each note is specified by one `UWORD` in the buffer -- so that buf would be declared as
+
+ UWORD buf[ ]
+
+For each note, the `UWORD` contains three pieces of information: _tone_, _length_, and _loudness_.
+
+There are only four possible values of loudness: `0` (the quietest), `1`, `2`, and `3` (the loudest).
+The loudness is multiplied by `64` before being added into the `UWORD` for the note.
+
+The duration is measured in 1/100ths of a second, and can have any value from `1` to `255`.
+The duration is multiplied by 256 before being added into the UWORD for the note.
+
+The allowed values of tone range in principle from `0` to `0x3f`.
+See below for more details.
+
+==== Example
+
+[source,c]
+----
+#include <p_std.h>
+#include <p_file.h>
+#include <epoc.h>
+
+GLDEF_C INT main(VOID)
+
+    {
+    INT ret;
+    VOID *mcb;
+    UWORD buf[10];
+    UWORD len;
+    WORD musstat;
+
+    ret=p_loadldd("SNDFRC.LDD");
+    if (ret && ret!=E_FILE_EXIST)
+        return(ret);
+    ret=p_open(&mcb,"MUS:",-1);
+    if (ret)
+        return(ret);
+    buf[0]=0x30+(40<<8);
+    buf[1]=0x32+(100<<8);
+    buf[2]=0x34+(40<<8)+(1<<6);
+    buf[3]=0x35+(100<<8)+(1<<6);
+    buf[4]=0x37+(40<<8)+(2<<6);
+    buf[5]=0x39+(100<<8)+(2<<6);
+    buf[6]=0x29+(40<<8)+(3<<6);
+    buf[7]=0x3b+(100<<8)+(3<<6);
+    len=8;
+    p_ioa5(mcb,P_FWRITE,&musstat,&buf[0],&len);
+    p_iowait();
+    return(0);
+    }
+----
+
+This plays a scale of eight notes, with notes having wavering length and increasing loudness.
+
+==== Possible tones
+
+There are three types of tones that the Series 3 loudspeaker hardware can emit: DTMF tones, modem tones, and musical tones.
+
+For standard dual DTMF tones, set the tone part of the UWORD to: 0x10 for DTMF digit 0, 0x11 for digit 1, ..., `0x19` for "digit" `9`, `0x1a` for "digit" `a`, ..., `0x1d` for "digit" `d`, `0x1e` for `*`, and `0x1f` for `#`.
+
+For modem tones, `0x24` gives 1300 Hz, `0x25` gives 2100 Hz, then 1200, 2200, 980, 1180, 1070, 1270, 1650, 1850, 2025, and 0x2f gives 2225 Hz.
+
+As for musical tones, twenty five notes are possible, incrementing by semi-tones over a 2-octave interval from D#5 to D#7.
+The corresponding tone values are 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x29, 0x3b, 0x3c, 0x3d, 0x0e, 0x3e, 0x2c, 0x3f, 0x04, 0x05, 0x25, 0x2f, 0x06, and 0x07.
+
+==== Pauses
+
+In order to pause, in the middle of a buffer of notes, set the tone value to 0 for one note.
+
+==== When to open and close `MUS:`
+
+An application that makes use of `MUS:` services from time to time ought to call `p_close` to free the sound channel whenever it is not immediately needed.
+This allows other applications to make temporary use of the sound channel -- eg for alarms or for standard DTMF dialling dialogs.
+
+If you wrote a game which opened `MUS:` at its beginning, and only made sounds from time to time, and left this game in background while you went to the Data application to look up a telephone number, you would find the DTMF dialler would be unable to emit any sounds, and would report "Sound system in use" -- even though the game is silent at the time.
+
+Far better in these situations for a program to open `MUS:` just before it needs to use this channel, and then close it again immediately afterwards.
+
+==== When to install and de-install the ldd file
+
+Once `sndfrc.ldd` has been installed, it occupies about 1.7 K of RAM.
+For this reason, it would seem to be best to de-install it, when the application terminates.
+The way to do this is to call (see the _PLIB Reference_ manual for more details)
+
+[source,c]
+----
+p_devdel("MUS:",E_LDD);
+----
+
+This call will fail if another application currently has an open channel to `MUS:`.
+Applications should ignore any errors from `p_devdel`.
+
+Note however that if an application has:
+
+* called `p_loadldd` to ensure `MUS:` can be found
+* called `p_open` to open a channel to `MUS:`
+* played some notes
+* called `p_close` to free up the sound channel
+
+then it cannot rely on `MUS:` still being installed if it calls `p_open` again at a later stage.
+For another application may have called `p_devdel`, successfully, in the meantime.
+
+The upshot of this is that applications should call `p_loadldd` prior to any call to open a channel to `MUS:`.
+
+=== Sound on the Series 3a
+
+This section does not make reference to the recording and playing of digital sound -- for details see the _General System Services_ chapter of the _PLIB Reference_ manual.
+
+The Series 3a's built-in `SND:` device driver can be used to simultaneously play two tunes on the built-in speaker.
+Although the sound quality is not as high as with digital sound files, the memory requirements are much less.
+For example to play a tune lasting six seconds would require a digital sound file of size 49,184 bytes.
+A comparable figure using the `SND:` device driver would be less than #1 Kb#.
+
+The demonstration program `sound.c` (in `\SIBOSDK\DEMO` on the supplied disks) plays two sequences of notes using both channels of the built-in `SND:` sound device driver (only one application can have access to these channels at any given time).
+The tune is the so-called "ice cream van" tune that you may already have met in the _Sound_ chapter of the _i/o Devices_ manual -- it is in any case recommended that you read that chapter before proceeding.
+
+The program demonstrates the following:
+
+* the opening and closing of a channel to the SND: device driver.
+* the sensing and setting of the volume level and the number of beats per minute.
+* the writing of notes to the two sound channels.
+
+A number of points are worth making:
+
+* a side effect of opening a channel to the `SND:` device driver is to power up the speaker.
+As a consequence the `SND:` channel should be closed as soon as the sound has been played -- failure to do so could unnecessarily drain the batteries.
+* the `SND:` device driver, and hence the speaker, can only be used by one application at a time.
+As alarms and keyclicks will be disabled well written programs should close the `SND:` channel as soon as the sound has been played.
+* a serious of notes separated by silences can be created by setting the frequency to zero during the silent periods.
+* the sound will not play until a `P_FSSOUNDCHANNELn` request has been made on _both_ channels.
+The playing of sound on the two channels is thus automatically synchronised.
+* _both_ `P_FSSOUNDCHANNELn` requests must be made asynchronously using `p_ioc` or the `p_ioc5` variant.
+On a low battery the request will fail to complete with an error message written to the status word.
+* Use of `p_iow`, `p_iow4`, `p_ioa` and/or `p_ioa5` would hang the machine on a low battery -- a very serious programming error.
+* sound can be played on only one channel by passing the other channel a length of zero for the note buffer -- i.e. zero notes.
+* the `P_FSET` service sets both the volume and the beats per minute.
+The `P_FSENSE` service can be requested first to ensure that one or other parameter remains unchanged.
+
+To create a `sound.img` file simply type make sound in the appropriate directory.
+This file can then be copied to a `m:\img` directory on the Series 3a and run via the RunImg application in the usual manner.
+
+The code in `sound.c` is as follows:
+
+.sound.c
+[source,c]
+----
+#include <p_std.h>
+#include <p_file.h>
+#include <epoc.h>
+
+GLDEF_C VOID waitstat2(WORD *pstat1, WORD *pstat2)
+
+/* Wait for *pstat!=E_FILE_PENDING and *pstat2 != E_FILE_PENDING */
+
+    {
+    INT i;
+
+    i = -1;
+    do
+        {
+        p_iowait();
+        i++;
+        }
+        while (*pstat1 == E_FILE_PENDING && *pstat2 == E_FILE_PENDING);
+
+    if (*pstat2 == E_FILE_PENDING)
+        pstat1 = pstat2;
+    p_waitstat(pstat1);
+
+
+    while (i--)
+        p_iosignal();
+    }
+
+GLDEF_C VOID play_notes(WORD *buf1, WORD *buf2, WORD l1, WORD l2, INT volume, INT beatsPerMinute)
+
+    {
+    VOID *pcb;
+    WORD sndstat1,sndstat2;
+    E_SOUND sound;
+    INT err;
+
+    if ((err=p_open(&pcb,"SND:",-1))<0)
+        {
+        p_close(pcb);
+        p_exit(err);
+        }
+
+    if ((err=p_iow3(pcb,P_FSENSE,&sound))<0)
+        {
+        p_close(pcb);
+        p_exit(err);
+        }
+
+
+    if (beatsPerMinute >= 0)
+        sound.beatsPerMinute = (UBYTE) beatsPerMinute;
+
+    if (volume >= 0)
+        sound.volume = (UBYTE) volume;
+
+    if ((err=p_iow3(pcb,P_FSET,&sound))<0)
+        {
+        p_close(pcb);
+        p_exit(err);
+        }
+
+    p_ioc5(pcb,E_FSSOUNDCHANNEL1,&sndstat1,&buf1[0],&l1);
+    p_ioc5(pcb,E_FSSOUNDCHANNEL2,&sndstat2,&buf2[0],&l2);
+    waitstat2(&sndstat1,&sndstat2);
+
+    p_close(pcb);
+
+    if (sndstat1 != 0 || sndstat1 != 0)
+        p_exit(0));
+    }
+
+GLDEF_C INT main(VOID)
+
+    {
+    WORD notes1[] = {1048,24,524,12};
+    WORD notes2[] = {1048,4,1320,4,1568,4,2092,4,1568,4,1320,4,1048,12};
+    WORD len1 = sizeof(notes1)/4,len2 = sizeof(notes2)/4;
+    INT i;
+
+    for (i = 0; i < 6; i++)
+        {
+        play_notes(&notes1[0],&notes2[0],len1,len2,i,-1)
+        p_sleep(1);
+        }
+
+    for (i = 0; i < 6; i++)
+        {
+        play_notes(&notes1[0],&notes2[0],len1,len2,-1,140 + i*20)
+        p_sleep(1);
+        }
+    return(0);
+    }
+----
+
+The `main` routine initialises the note buffers, then repeatedly passes the buffers, the buffer lengths, the volume and the beats per minute, to the subroutine `play_sound` that plays the tune.
+The tune is repeated first at the default beats per minute for all six allowed volume levels, and then at the default volume for six values of the beats per minute.
+The default is specified by passing a negative integer for the volume and/or the beats per minute.
+
+The subroutine `play_sound` opens the `SND:` channel, senses and sets the volume and beats per minute, plays the notes and closes the `SND:` channel.
+In the case of an error in, for example, sensing, `play_sound` closes the `SND:` channel and returns with an error code.
+As mentioned earlier it is essential that the `P_FSSOUNDCHANNELn` requests be made asynchronously using either `p_ioc` or `p_ioc5` PLIB library routines, as these guarantee completion even in the event of low batteries.
+
+A large fraction of the code in `play_sound` is concerned with error checking in order to ensure that the routine behaves in a sociable way.
+In particular the `SND:` channel is closed as soon as an error is discovered so to conserve power -- this is essential when running on batteries and such measures should be standard in any quality application.
+
+The subroutine `waitstat` waits on the process i/o semaphore until completion of the two asynchronous requests specified by the `pstat1` and `pstat2` status words (for further details of such matters see the _Asynchronous Requests and Semaphores_ chapter of the _PLIB Reference_ library).
+It is in fact a version of the PLIB library routine `p_waitstat` that waits on two status words rather than one.
+
+The `return(0)` statement at the end of the main routine informs the Series 3a that the program has ended normally: it can also be omitted entirely.
+Use of the `return` statement with no return value is not recommended: in practice this will return a random error code possibly leading to the display of a spurious full screen error message.
+

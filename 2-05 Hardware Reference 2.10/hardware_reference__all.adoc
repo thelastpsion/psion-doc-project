@@ -1,0 +1,35 @@
+= SIBO 'C' Software Development Kit : HARDWARE REFERENCE
+include::../defaults.adoc[] 
+
+Version 2.10
+
+February 3, 1995
+
+WARNING: The data in this manual is provided for information only.
+You are strongly advised not to make direct access to any of the hardware since this may conflict with access made by EPOC.
+To guarantee future compatibility, hardware access should only be made via the appropriate operating system calls.
+
+[colophon]
+== Colophon
+*(C)Copyright Psion PLC 1990-98*
+
+All rights reserved.
+This manual and the programs referred to herein are copyrighted works of Psion PLC, London, England.
+Reproduction in whole or in part, including utilization in machines capable of reproduction or retrieval, without express written permission of Psion PLC, is prohibited.
+Reverse engineering is also prohibited.
+
+The information in this document is subject to change without notice.
+
+Psion and the Psion logo are registered trademarks, and Psion, Psion MC, Psion HC, Psion Series 3, Psion Series 3a, Psion Series 3c, Psion Siena and Psion Workabout are trademarks of Psion PLC.
+
+TopSpeed is a registered trademark of Clarion Software Corporation.
+IBM, IBM XT and IBM AT are registered trademarks of International Business Machines Corp.
+Microsoft and MS-DOS are registered trademarks of Microsoft Corporation.
+Apple and Macintosh are registered trademarks of Apple Computer Inc.
+VAX and VMS are registered trademarks of Digital Equipment Corporation.
+80C86, 8088, 8288, 8259 and SLD are registered trademarks of Intel Corporation.
+V30 and V30H are registered trademarks of NEC Corporation.
+Brief is a registered trademark of Underware Inc.
+Psion PLC acknowledges that some other names referred to are registered trademarks.
+
+include::hardware_reference_ch01.adoc[]

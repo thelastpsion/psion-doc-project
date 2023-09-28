@@ -1,0 +1,253 @@
+== SERIES 3 PROGRAMMING OVERVIEW
+
+Throughout the Series 3 Programming Guide, reference to the Series 3 machine should be taken to include the Series 3a and the Workabout unless stated otherwise.
+
+See also the Workabout Programming Guide for further information specific to that machine.
+
+=== Programming possibilities
+
+In general terms, there are six different levels at which programs can be written for the Series 3:
+
+* using OPL, creating `.opo` or `.opa` program files
+* using CLIB, with user interface restricted to console i/o of the `getchar` and `puts` variety
+* using PLIB, again with user interface restricted to console i/o
+* using WLIB, accessing the graphics and windowing capabilities of the Window Server
+* using Hwif, with its support for menus and dialogs similar to those available in OPL/w
+* using HWIM, FORM, OLIB and (for the Series 3a) XADD, the object-oriented DYLs built into the ROM.
+
+All but the first of these uses the C programming language.
+
+For programming in OPL see the Series 3, Series 3a and Workabout Programming manuals, or the _SIBO OPL Software Development Kit_.
+
+For more detailed information about PLIB library routines and the window server see the _PLIB Reference_ and Window Server Reference manuals respectively.
+
+Programming using Hwif is also covered in its own separate manual, _Programming in Hwif_.
+This manual is particularly recommended on account of its relevance to the Series 3.
+
+For details of object-oriented programming see the object oriented sections of the C SDK, starting with the _Object Oriented Programming Guide_.
+
+The present manual focuses on features of the Series 3 and Series 3a that are by-and-large unique to these particular computers (as opposed to other computers in the SIBO range, that is, the HC and MC computers).
+These features include:
+
+* the difference between `.app` and `.img` forms of program file
+* communications between applications and the System Screen
+* the specialised form of the command line for applications
+* some device drivers unique to the Series 3 and/or Series 3a
+* development tools particularly suited to the Series 3 and Series 3a computers.
+* writing applications that run on all machines.
+
+Other parts of the SDK that may be found of particular relevance to programming for the Series 3 include:
+
+* the descriptions of file formats used by various applications, in the _Additional System Information_ manual
+* a description of the special form of printer driver files used on the Series 3, also in the _Additional System Information_ manual.
+
+Before proceeding further with this chapter, the reader is recommended to be familiar with the basic contents of the General Programming manual.
+
+=== Differences between `.app` files and `.img` files
+
+Strictly speaking, there is no real difference between files with extension `.img` and those with extension `.app`.
+For example, although the System Screen usually expects to install `.app` files, it will also, if requested, install suitable `.img` files.
+
+However, by convention a `.app` file contains one or more extra so-called _add-files_ embedded within it, in addition to the core `.img` file itself.
+These files may include:
+
+* a `.pic` file providing the icon for the application
+* a `.rsc` or `.rzc` file providing the resource file for the application
+* a `.shd` file providing the shell data for the application.
+
+Any such add-files can be added into the `.img` file automatically, via the operation of emake.exe, at the time the `.img` file is itself created.
+What controls the set of add-files used (if any) is the presence or absence of a suitably named _add-file list_ (`.afl`) file.
+
+==== Add-file lists
+
+An add-file list (`.afl`) file is a text file containing from one to four filenames.
+For example, the contents of a file `tele.afl` could be:
+
+ tele.pic
+ tele.rsc
+ tele.shd
+
+When any `.pr` project file is invoked that leads to the building of `tele.img`, the existence of a file `tele.afl` is checked for.
+If such a file is found, the files listed therein are combined with the core `.img` file to form a larger `.img` file as output.
+By convention, `.img` files that contain embedded add-files are renamed to `.app`
+files.
+
+See the chapter _Building an Application_ in the _General Programming_ manual, for more details.
+
+==== Pre-defined add-file slots
+
+The `RSCFILE` class in the OLIB library can find resource files embedded in a `.app` file, but only if they are placed in the second of the four slots.
+
+The System Screen expects to find a `.shd` file in the _third_ add-file slot of a program being installed, and indeed will refuse to install it if no such data is found there.
+
+The Window Server, however, will find a `.pic` file (or a `.fon` file) at any of the four add-file positions within a `.app`.
+In view of the requirements for resource files to occupy the second slot, and for `.shd` files to occupy the third slot, `.pic` icon files are usually placed in the first add-file slot -- as in the above example.
+
+At the time of writing, there is no mechanism to specify a file for (say) the third add-file slot, while omitting the second add-file altogether.
+For this reason, it may occasionally be necessary to create and maintain a zero-length file for the second slot.
+
+==== Running programs via RunImg
+
+An alternative to installing a program in the System Screen with its own file list is to run it from the RunImg icon:
+
+* the user presses kbd:[Tab] while the highlight is within the RunImg file list
+* the user navigates the file selector until it selects the program file
+* the user presses kbd:[Enter] to start this program.
+
+This procedure can be simplified if the program is placed in a top-level \img\ directory, and given the extension `.img`.
+In this case, the program will automatically appear as an entry in the RunImg file list.
+
+However, a program run in this way will receive no special command line from the System Screen.
+Nor will it receive any Shutdown or Switchfile messages from the System Screen.
+(These messages are discussed in the following chapter).
+
+==== Program files with and without icon files
+
+An application can simply not have an icon, although in this case the system screen will simply refuse to install it.
+The application can, however, still be run from RunImg, in which case, an empty icon boundary will be displayed in any status window used.
+
+Icon files, such as `tele.pic`, may be produced by a variety of means:
+
+* using the _Iconed_ demo application that can be built using the Hwif part of the SDK or, for the
+Series 3a and Workabout, the _Iconeda_ application that is installed in a `\sibosdk\s3atool` directory
+* using the Window Server tool `wspcx.exe` on the `.pcx` output of a PC program such as Windows PaintBrush.
+
+The `.pic` file can contain:
+
+* a 24x24 bitmap for a Series 3 icon.
+* two 48x48 bitmaps for a Series 3a icon - the first and second bitmaps specify the black and grey planes respectively.
+* a 24x24 bitmap for a Series 3 icon followed by two 48x48 bitmaps for a Series 3a icon.
+
+The format of `.pic` files is given in the Bitmaps section in the _Window Server Reference_ manual.
+
+==== Resource files and shell data files
+
+See the _Resource Files_ chapter of the _Additional System Information_ manual for a description of the format and uses of resource files.
+
+Shell data files are discussed in the following chapter.
+
+==== Customised add-files
+
+In most cases, at least one add-file slot will be free for use by the application itself.
+
+One important reason to build an extra file into the `.app` file, rather than leaving such a file separate, is that it diminishes the chance of a user copying the `.app` file from one SSD to another but neglecting to copy a vital associated file at the same time.
+
+==== Finding add-files within a .app file
+
+Ordinarily, applications have no need to find add-files within themselves, since system code takes care of this on their behalf.
+
+One possible exception is when an application needs to access a customised add-file.
+In this case, knowledge of the format of the header of a `.img` (or a `.app`) file is required.
+In fact, this header just contains the same information as is returned by invoking `edump.exe`.
+
+The header of a `.img` file is described by the `ImgHeader` struct, defined in `epoc.h`.
+See the chapter `Processes and Inter-process Messaging` in the `PLIB Reference` manual for a discussion on this struct.
+
+An example of code that attempts to locate a resource file in the second add-file slot of a `.app` file is as follows:
+
+[c,source]
+----
+GLDEF INT rscfile_rs_init(PR_RSCFILE *self,TEXT *name)
+    {
+    ImgHeader head;
+
+    /* self->rscfile.offset is zero by default */
+    f_open(&self->rscfile.pcb,name,P_FRANDOM|P_FSTREAM|P_FSHARE);
+    if (p_read(self->rscfile.pcb,&head,sizeof(head))==sizeof(head))
+        {
+        if (!p_scmp(&head.Signature[0],"ImageFileType**"))
+            { /* we have a .img file */
+            if (!(self->rscfile.offset=head.Add[1].offset))
+                p_leave(E_FILE_INVALID);
+            }
+        ...
+    }
+....
+}
+----
+
+=== Multi-lingual applications
+
+The topic of multi-lingual applications is discussed in general terms in the course of the _Resource Files_ chapter of the _Additional System Information_ manual.
+
+There are some issues about the set of possible command hot-keys ("menu accelerators"), however, that are particular to the Series 3.
+
+The set of possible accelerators varies from language to language on account of the keyboard changing.
+
+All languages must, however, support the 26 accelerators 'a' through 'z', together with four more.
+
+These additional accelerators are '+', '-', '*', and '/' in most languages.
+The only exceptions so far are French and Spanish (and Belgian, which uses the French keyboard):
+
+* French replaces '/' with '?'
+* Spanish replaces '*' with '>' and '/' with 'ñ'.
+
+Applications which fail to take account of these changes when they are translated into another language will find they end up carrying a "lame" accelerator: the accelerator is displayed on the menu, but there is no way for the user to press the required key combination.
+
+=== Environment variables on the Series 3
+
+Environment variables can be a powerful programming resource whilst being, at the same time, potentially anti-social.
+
+There are two aspects to this:
+
+* environment variables consume space in a special RAM segment devoted to them -- the more environment variables are created (and the larger these are), the greater the chance becomes of other applications failing to work properly -- on account of not being able to create _their_ environment variables.
+* _name clashes_ are possible -- data stored in an environment variable by one application may get obliterated by another application storing different data to an identically named variable.
+
+With regard to the first problem, all that can be said is that due caution should be observed.
+Otherwise, your application may earn itself a bad name.
+
+With regard to the second problem, what is evidently required is some kind of naming convention.
+
+For a full discussion of environment variables see the paragraphs preceding `p_getenv` in the _PLIB Reference_ manual.
+
+==== Avoid `$` signs
+
+The `$` sign is used in names of environment variables created and manipulated by Psion system software.
+
+All external applications should completely avoid using environment variables with '`$`' signs in them -- unless they first secure the agreement of Psion.
+
+The plan is to extend the use of '$' to mean, not just "used by Psion", but rather "licensed by Psion".
+Interested software developers who contact Psion will be given a short identifier -- for example, "`$17$`".
+A company which receives this identifier could then create environment variables with names such as "`$17$table`" or "`$17$md`", secure in the knowledge that no other responsible developer will also use these names.
+
+In conclusion, '`$`' signs should be avoided in all cases; even where approved by Psion, environment variable names should include '`$`' signs only in their identifier region.
+Thus a name of "`$A$17$`" would not be allowed.
+Environment variables can of course continue to have "simple" names, such as "`table`" and "`md`", but in this case, the chance of a name clash remains.
+
+=== Series 3 family compatibility
+
+==== Series 3/Series 3a/Workabout compatibility
+
+All Series 3 applications are fully compatible with the Series 3a and Workabout.
+These two machines automatically recognise such applications and run them in compatibility mode -- both the icon, as displayed on the system screen, and the display are expanded linearly by a factor of two in each dimension.
+
+In fact an application that wishes to use the full screen capabilities of the Series 3a or Workabout must explicitly turn off the compatibility mode by calling the `wCompatibilityMode` function -- see the _Window Server Reference_ manual for further details.
+
+An application can identify which machine it is running on -- using a call to `p_getlcd` - see the _PLIB Reference_ manual for details, and Compatibility in the General Programming Manual for an example.
+
+Thus it is quite feasible to write an application that runs on the Series 3, Series 3a and the Workabout, using the screen of each machine to the full.
+However, care should be taken to ensure that the application does not use any Series 3a or Workabout specific features when running on the Series 3 - the grey scale
+or, on the Series 3a, the improved sound facilities for example.
+The Workabout also has different keyboard scan codes from the other members of the Series 3 family, (see _Hardware Management_, in the _EPOC O/S System Services_ manual).
+
+==== Compatibility with Series 3c and Siena
+
+===== Programs written for the Series 3
+
+All Series 3 programs can be expected to run without modification on both the Siena and the Series 3c.
+The programs will run in compatibility mode, as they do on the Series 3a.
+
+===== Programs written for the Series 3a
+
+Most types of program will run without modification on the Series 3c.
+
+It is likely that most Series 3a programs will need some modification, to take account of the smaller screen size, before they will run on the Siena.
+Menus and dialogs in Series 3a programs will, in general, be too wide and will need to be reorganised and/or reworded.
+Applications that use a sophisticated layout in their display are likely to need extensive modification before they can be used on the Siena.
+
+Series 3a applications written using the Hwif library, and which use grey lines in their menus, will need to be relinked with a suitably modified Hwif library before they will run on either the Siena or the Series 3c.
+This incompatibility is associated with the introduction of small fonts for dialogs on the Workabout and Siena.
+
+Hwif programs that are compiled and linked with a modified Hwif library (see the _Programming in Hwif_ chapter of #this upgrade document#) that is supplied with the upgrade software can run on the Series 3,
+Series 3a, Series 3c, Workabout and Siena - provided, of course, that their displays are tailored to the various screen sizes and graphics capabilities of these machines.
+

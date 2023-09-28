@@ -1,0 +1,132 @@
+== USE OF `SPY.APP`
+
+=== Introduction
+
+This chapter describes the _Spy_ application for the Series 3.
+This application contains many features that may help to "debug" problems with applications on the Series 3.
+
+The version of _Spy_ described in this chapter is suitable for use on both the Series 3 and the Workabout,
+and can also be used on the Series 3a.
+A built version of `spy.app` that is specifically designed for use on the Series 3a will be found, following installation of the core SDK software, in the `\sibosdk\s3atool` directory.
+
+==== Building `spy.app`
+
+The _Spy_ application is released in source form, as one of the Hwif demonstration programs.
+
+To build it, proceed in the same way as to build any of the other Hwif demonstration programs:
+
+* move into the `\sibosdk\hwdemo` directory
+* type `make spy`
+* the resulting image file `spy.img` can be renamed to `spy.app` and copied into a `\app` directory on the Series 3 or the Workabout
+* the application can be installed in the System Screen and, on the Series 3, even assigned an application button -- eg kbd:[CONTROL+WORLD].
+
+=== The main display
+
+The main display is a scrolling list of processes currently running on the Series 3.
+The _Change processes_ menu option allows customisation of which processes are shown.
+"System" processes are simply ones whose names start with "`Sys$`", and include:
+
+[cols="1,4"]
+|===
+|`sys$shll`
+|which the user sees as the System Screen
+
+|`sys$wsrv`
+|the Window Server, which coordinates access to the screen and keyboard
+
+|`sys$fsrv`
+|the File Server, which coordinates access to the filing systems
+
+|`sys$mang`
+|the Manager, which keeps track of all resources used by processes (so that, for example, they can be properly tidied whenever processes exit)
+
+|`sys$ncp`
+|the "brains" behind Remote Link (when it is running).
+|===
+
+The Null process, `sys$null`, which performs the vital task of switching the Series 3 off following sufficient inactivity, is omitted from the list displayed, for various technical reasons.
+
+First letter matching works in the main window, so that eg pressing kbd:[C] enough times will position the highlight to the _Calc_ process.
+
+Arrows are drawn in the top right and bottom right corner, Agenda-wise, whenever there are more processes beyond the visible boundaries of the list.
+
+The data displayed is updated every time Spy comes into foreground, and also whenever the _Update_ menu option is selected.
+By default, it is also updated regularly on a timer, though this can be disabled by a menu option.
+The Refresh rate option governs how frequently updates take place, when the timer is enabled.
+
+There are in all twelve pieces of data that can be displayed for each process, but only three of these can be seen at any one time.
+Use the _Change data_ menu option to choose which.
+
+Many of the data items can be meaningfully displayed either in Hex or in Decimal.
+Another menu option controls this.
+
+==== Heap statistics
+
+Five of the twelve possible items of data concern the allocator heap of the process.
+Each process has its own heap, which can vary in size according to the needs of the program.
+Thus a Word Processor editing a large document will typically have a larger heap than a Word Processor editing a smaller document.
+
+Each heap is divided into "alloced cells" and "free cells".
+The items "Cells allocated" and "Cells free" count these, and the items "Bytes allocated" and "Bytes free" sum how many bytes belong in each category.
+
+This data can be of great help in developing applications.
+It is of course vital that an application frees cells it no longer requires -- otherwise these cells go to what is called "alloc heaven".
+Something to watch for in particular is alloc heaven following an out-of-memory failure.
+Typically, a process such as launching a dialog involves a number of different allocs; if any one of these fails, all the allocs which have already succeeded must be undone.
+System code provides mechanisms such as "automatic destruction" and "automated clean-up" to help applications here, but applications can use these incorrectly at times -- hence the need for real-time checking.
+
+==== Stack statistics
+
+Whenever a process starts, its stack is filled up with ``0xFF``'s.
+This makes it easy to see how much stack has been used, at any one time.
+Quality programs need to avoid having too large a stack -- the built-in applications default to a stack of `0xa00`.
+On the other hand, the operating system panics them (panic 69)
+if it ever discovers that their stack is less than `0x100`.
+This is because whenever an interrupt occurs, it runs in the stack of the current process.
+
+The _Reset least stack_ menu option simply refills the bottom of the process's stack with ``0xFF``'s (ie up to its present stack pointer).
+
+==== Segment statistics
+
+The "Segment size" of a process gives the size of its data segment -- which consists of the heap, static data private to the application, the stack, and finally the Epoc reserved statics at the bottom end.
+The quoted "Segment size" of an application can sometimes give a misleading account of how much memory it is
+actually using -- since there are free cells as well as alloced cells in the heap.
+From time to time, the operating system may try to compress these heaps, but it can only do this by removing any free cells _at the end_ of the heap.
+Applications should strive to avoid ending up with large free cells in the middle of their heap -- though this is a very difficult goal to achieve.
+
+==== Tests for heap integrity
+
+Whenever Spy collects heap statistics for an application, it also checks the heap integrity.
+Any defect (caused for example by writing beyond the end of an alloc cell, or freeing a cell that was never alloced) results in an immediate alert.
+This alert helps to pin-point problems which would otherwise only rear their head much later -- long after the real damage has been done.
+
+==== Process priorities
+
+The Process Priority gives the pecking order of the processes, as regards gaining CPU from the multi-tasking scheduler.
+Most applications the user sees run at `0x80` when in foreground, and at `0x70` when in background.
+This prevents computationally busy background tasks from detracting from the performance
+of the foreground task.
+
+Spy momentarily ups its own priority to a massive `0xc0` (the maximum allowed to non-OS processes) whenever it collects heap statistics from other processes, to lessen the chances of other processes manipulating their heaps at the same time as Spy is walking through them.
+Occasionally, Spy will find that a heap is momentarily marked as "locked" when it tries to survey it -- this indicating that the Operating System is busy doing something there -- in which case the heap statistics will all just be shown as `0` for that process.
+
+==== Other data
+
+The "Process ID" of a process is essentially the address of the control block of the application in the Operating System data space, although the top nibble reflects how many times that same slot has been re-used since the last reset (the top nibble will therefore always be zero for `sys$mang`, `sys$fsrv`, and `sys$wsrv`).
+When processes talk to each other, for example in conjunction with the _Bring_ menu option, they need to know each other's PID ("Process ID").
+
+The IO Semaphore count basically keeps track of how many outstanding events a process has to respond to.
+This will usually be -1 or zero, but if you task to the System Screen and then straight back to Spy again, you may see the count for `sys$shll` momentarily go as high as three.
+
+==== Logging Window Server statistics
+
+The menu command Log client produces information in text file form as to the structure of the windows, GCs, fonts, bitmaps, and other Window Server objects "owned" by an application.
+This information may of use in determining why certain drawing fails to appear on the screen.
+For example, it may be that a window is positioned wrongly, that the window is obscured by another, or that the current GC is set up incorrectly -- any such failure can be seen from the log file.
+
+The menu command Log all clients repeats this process for all the clients of the Window Server.
+
+The Log client command can, in effect, be invoked even when Spy is in background.
+Just press the key combination kbd:[Shift+Ctrl+Psion+N] and a dump of the Window Server object usage of the foreground application will be created -- by default in the file `\opl\wsreport.lis`.
+(This feature works because Spy has "captured" this key combination.)
+

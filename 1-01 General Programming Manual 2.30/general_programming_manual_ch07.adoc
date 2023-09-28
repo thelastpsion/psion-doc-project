@@ -1,0 +1,67 @@
+
+== COMPATIBILITY
+
+=== Introduction
+
+The vast majority of existing software will, in principle, run on all
+machines in the SIBO range, provided that the display can accommodate
+itself to the different screen sizes.
+
+For details of the differences between SIBO machines see _Writing
+Software for the HC_ in the _HC Programming Guide_ and the _Series 3
+family compatibility_ section of the _Series 3 Programming Overview_
+chapter in the _Series 3/3a Programming Guide_ manual.
+
+=== What machine am I running on?
+
+Most SIBO machines can be distinguished by their screen sizes, as
+determined by the return value from a call to `p_getlcd`.
+The possible return values for existing SIBO machines are as follows:
+
+[%header,cols="2m,^1,3"]
+|===
+|Constant |Value |Description
+
+|`E_LCD_640_400` |(0) |a 640x400 pixel display as on the MC 400
+|`E_LCD_640_200_SMALL` |(1) |a 640x200 pixel display as on the MC 200
+|`E_LCD_160_80` |(4) |a 160x80 pixel display as on the HC
+|`E_LCD_240_80` |(5) |a 240x80 pixel display as on the Series 3
+|`E_LCD_480_160` |(11) |a 480x160 pixel display as on the Series 3a and Series 3c
+|`E_LCD_240_100` |(12) |a 240x100 pixel display as on the Workabout
+|`E_LCD_240_160` |(14) |a 240x160 pixel display, as on the Siena
+|===
+
+This will distinguish all machines except the Series 3a and Series 3c, which have screens of the same size.
+These two machines can be distinguished by means of a call to the function `p_returnexpansionportinfo`, present in machines with EPOC version 3.90F or later, as in the following example code fragment.
+
+[source,c]
+----
+UINT lcdtype;
+UINT version;
+UINT port;
+
+lcdtype=p_getlcd();
+if (lcdtype==E_LCD_480_160)
+    { /* S3a or S3c */
+    version=p_version();
+    if (version>=0x390F)
+        { /* safe to call p_returnexpansionportinfo */
+        port=p_returnexpansionportinfo();
+        if ((port & 0x0700)==0x0300)
+            {
+            /* must be S3c */
+            }
+        else
+            {
+            /* must be S3a */
+            }
+        }
+    else
+        {
+        /* EPOC version less than 3.90, so must be S3a */
+        }
+else
+    {
+/* machine determined by LCD type */
+    }
+----

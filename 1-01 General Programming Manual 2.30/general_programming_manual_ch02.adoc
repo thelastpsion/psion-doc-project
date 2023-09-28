@@ -1,0 +1,173 @@
+== A BRIEF OVERVIEW OF THE SIBO SDK
+
+=== Introduction
+
+The SIBO SDK consists of a set of floppy disks containing the SDK software and a number of manuals describing the software and the Psion SIBO family of mobile and hand-held computers.
+The floppy disks contain the various tools, header files, libraries etc that are required to produce an image (`.img`) file that will run on Psion SIBO machines.
+
+==== Manuals
+
+The SDK manuals supplement the TopSpeed manuals.
+In particular you are referred to the TopSpeed C Library reference for the description of standard C (CLIB) library functions.
+
+The SDK contains the following manuals:
+
+[cols="1h,2"]
+|===
+2+|Volume 1
+
+|General Programming Manual
+|This manual.
+It describes how to install the SDK, and how to build an application that will run on the SIBO machines.
+It also contains some notes on using the TopSpeed C Library reference manual, some discussion on how to copy protect software for SIBO computers, and a potentially very important chapter entitled Fundamental Programming Guidelines.
+
+|HC Programming Guide
+|Some documentation particularly oriented around the HC computer range.
+
+|Series 3/3a Programming Guide
+|Some documentation particularly oriented around the Series 3 range of machines.
+
+|Workabout Programming Guide
+|Some documentation particularly oriented around the Workabout computer.
+
+|EPOC O/S System Services
+|Describes the software interrupt interface to the ROM-based system services.
+An appendix contains a complete listing of the EPOC service numbers.
+This will be of particular use to OPL and assembly language programmers who wish to make direct access to EPOC services.
+
+|Additional System Information
+|Describes the MCLink communications software, resource files, WDR printing, various file formats, how to write device drivers, and other miscellaneous topics.
+
+2+|Volume 2
+
+|PLIB Reference
+|Describes the Psion PLIB library (this library provides the most direct access to the ROM based system services).
+
+|Window Server Reference
+|Describes the window server library WLIB which implements a range of sophisticated graphics operations.
+
+|I/O Devices Reference
+|Describes the interface to some of the Epoc device drivers, including those which access the serial and parallel ports.
+
+|The SIBO Debugger
+|Describes how to use the SIBO Debugger to debug applications being developed for SIBO computers.
+
+|Hardware Reference
+|Describes the basic hardware of SIBO computers.
+
+2+|Volume 3
+
+|Programming in HWIF
+|Describes the HWIF library (which contains support -- mainly for the Series3 -- for menus, dialogs, editors, and printing).
+
+|Object Oriented Programming Guide
+|Describes the development of applications using Object Oriented techniques.
+Its introduction provides an overview of Psion’s Object Oriented programming system and of the OLIB, HWIM, FORM and XADD object libraries.
+
+|ISAM Reference
+|Describes the ISAM dynamic library which provides Indexed Sequential Access management for large database files.
+
+|OLIB Reference
+|Describes the OLIB object library.
+
+2+|Volume 4
+
+|FORM Reference
+|Describes the FORM object library.
+
+|HWIM Reference
+|Describes the HWIM object library.
+
+|XADD Reference
+|Describes the XADD object library.
+|===
+
+==== Where to start
+
+There is a very large amount of information in these manuals -- perhaps too much for any one person to keep it all in their head.
+However, few developers will need to make detailed reference to more than around half of the manuals.
+
+The manuals contain many cross references to sections where various topics are discussed in more detail.
+Use these cross references to help you find your way around the SDK documentation.
+The chapter immediately after this one is probably the best place to start.
+Alternatively, start reading the _HC Programming Guide_, the _Series 3/3a Programming Guide_,
+the _Object Oriented Programming Guide_, the _Plib Reference manual_ -- or anything that catches your eye as you flick through the pages.
+
+==== The terms SIBO and EPOC explained
+
+A SIBO machine is a battery-powered portable computer that is based on the SIBO architecture.
+This architecture is designed to minimise the size, weight and power consumption of the computer.
+The key components of the architecture are:
+
+* A sophisticated power management system that selectively powers subsystems under software control
+* Solid State Disks (SSDs) that provide fast low-power silicon-based mass storage with no moving parts
+* A synchronous serial interface for peripherals running at high speed (Mega bit rates)
+* An 8086 class of processor (or any compatible processor such as an 80286)
+* Hardware protection of the system from aberrant processes (address trapping of out-of-range writes and a watch-dog timer on interrupts being disabled)
+* Real-time clock
+* ROM-resident system software
+* Graphics LCD display
+* A touch sensitive digitising pad that provides a pointing device (used in some models)
+* ISDN combo sound system (used in some models).
+
+The hardware architecture is primarily implemented in custom ICs called ASICs.
+The SIBO architecture uses surface-mounted static CMOS ICs throughout.
+For further information see the _Hardware Reference_ manual.
+
+The EPOC operating system, designed for the SIBO architecture, has the following features:
+
+* preemptive multi-tasking
+* MS-DOS-compatible file systems
+* installable file systems, including remote file access
+* asynchronous services
+* support for client-server architectures (used to implement system components such as the file server and window server)
+* a comprehensive I/O system with many built-in I/O devices
+* dynamically loadable device drivers
+* reentrant function library
+* multiple processes of the same program share a single copy of the code
+* support for object-oriented programming
+* code-shared dynamic link libraries.
+
+On SIBO machines, the system software resides on an in-built ROM.
+A version of the EPOC operating system also runs on a PC.
+
+See the _PLIB Reference_ manual for more details.
+
+=== Fatal programming errors (Panics)
+
+When the system detects a condition that it believes could only arise from a bug in a the application program, the system terminates the process with a "panic number" in the range 0 to 255 inclusive (where the system is said to "panic the process").
+A panic is a fatal exception that causes the process to terminate immediately.
+There is no way for applications to avoid being terminated when a panic has been started.
+As well as protecting the system from defective applications, the panic system enforces a greater discipline on application code by terminating a process as soon as the condition is detected.
+
+==== Panic numbers
+
+Programming errors detected within different areas of the system code give rise to different panic numbers.
+The following table lists the possible panic numbers and the corresponding system code that can give rise to them.
+
+[cols="1,3"]
+|===
+|0 to 80, and 255 |The PLIB library 
+|81 to 129 |The Window Server library
+|130 to 160 |The OLIB object library
+|===
+
+These panic numbers are described in more detail in the appropriate manuals.
+
+Panic numbers in the range 160 to 254 are used by code that is not resident in the ROM (such as the ISAM library).
+A given panic number may be used by more than one piece of code; such a panic may therefore have one of a number of causes.
+The only definitive way to discover the origin of such a panic is to make use of the SIBO Debugger to catch the panic and then trace it back to its source.
+
+=== C++ and Object Oriented programming
+
+This version of the SDK is compatible with TopSpeed C++ although, at the time of writing, the TopSpeed C++ package is not supplied by Psion as part of any variant of the SDK.
+
+Note that the kinds of classes, and the means of creating and accessing them, in C++ are quite different from those in the Psion Object Oriented programming system.
+
+Regardless of whether you use C or C++ to develop Object Oriented applications, if you wish to use Psion objects you must create instances of them and send messages to them by the mechanisms that are described in the _Object Oriented Programming_ chapter of the _PLIB Reference_ manual and the _Object Oriented Programming Guide_.
+
+If you intend to develop a SIBO application that uses _only_ Psion objects, you may still use C++ as a "better" version of C, without making use of its Object Oriented aspects.
+
+You may, if you wish, use a mix of Psion and C++ classes, provided you make sure that you create and use instances of classes of each kind by the appropriate means.
+It is quite acceptable, for example, to use Psion classes for the application manager and user interface, but use C++ classes in the `engine' of an application.
+
