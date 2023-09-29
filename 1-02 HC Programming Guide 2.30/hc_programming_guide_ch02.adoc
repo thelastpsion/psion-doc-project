@@ -1,0 +1,560 @@
+== WRITING SOFTWARE FOR THE HC
+
+=== Basic programming choices
+
+==== Choice of programming language
+
+The two main high-level programming languages for the HC are OPL and C.
+
+Whilst OPL has many points in its own favour for smaller projects (discussed in the _OPL Development Kit_), the following points are likely to sway any competent programmer to use C for any more substantial application on the HC:
+
+* C code executes more swiftly.
+* C is a richer programming environment, with abstract data structures, pointers, and typedefs.
+* It is generally much simpler to call routines in the OS from C than from OPL.
+* Programmers with experience of C have no need to learn OPL.
+* Code written in C for other products on other hardware can obviously be converted more quickly into C for the HC than into OPL for the HC.
+* Conversely, code written in C for the HC is more likely than OPL code to have parts that are portable to other projects; in this sense, programming in C is a better long-term investment.
+Occasionally, some code may have to be written in assembly language (for example, when writing a device driver).
+
+==== Standard C (CLIB) or Psion C (PLIB)
+
+A significant proportion of C code that companies have already written for other target computers can be transferred almost straightaway to run on an HC.
+All that is necessary to do is to recompile and re-link the code.
+
+To take a very simple example, the program simple.c
+
+[source,c]
+----
+#include <stdio.h>
+
+int main(void)
+{
+    puts("Hello world");
+    getchar();
+    return(0);
+}
+----
+
+together with a project file `simple.pr`
+
+----
+#system epoc img
+#compile simple.c
+#link simple
+----
+
+will run on an HC without any difficulty whatsoever (see the chapter _Building an Application_ in the
+_General Programming Manual_ for further discussion of TopSpeed `.pr` project files and their usage).
+
+However, it is recommended that HC programmers rewrite the above program as follows:
+
+[source,c]
+----
+#include <p_std.h>
+#include <p_sys.h>
+
+int main(void)
+{
+    p_puts("Hello world");
+    p_getch();
+    return(0);
+}
+----
+
+with the project file changed to
+
+----
+#system epoc img
+#set epocinit=iplib
+#model small jpi
+#compile simple.c
+#link simple
+----
+
+The latter is said to be the "PLIB" version of the former, which is a "CLIB" program (the "P" of "PLIB" stands for "Psion").
+
+The following differences will be noticed between the two programs:
+
+* the PLIB program uses Psion-proprietary header files.
+* the PLIB program uses Psion-proprietary function calls (`p_xxx` functions).
+* the PLIB program links with a different library (this is the significance of the `epocinit` line in the project file).
+
+Code written with PLIB calls is considerably more compact than code written with CLIB calls.
+For example the image file for the example PLIB program (see above) has size 576 bytes compared with the image file for the equivalent CLIB program that has size 4480 bytes -- an increase in size of almost seven hundred per cent.
+
+The reason for the greater compactness of compiled PLIB code is that PLIB functions provide only   very thin shells for functionality already present in the HC's ROM.
+Thus PLIB calls make more efficient use of the HC ROM software than do the equivalent CLIB calls.
+Being tailored to the particular needs of computers like the HC, PLIB evolved with very different constraints and objectives from standard C libraries.
+In many cases, PLIB functions can be claimed to "improve" upon the specification of their nearest CLIB equivalents.
+
+The use of PLIB calls does not always lead to such large space savings as seen in the example programs (see above) -- the reduction in the size of the compiled code depends on the number and types of library function calls made.
+
+Sometimes it will be desirable to write an application using both CLIB and PLIB calls simply because this can ease the process of converting large programs to run on the Sibosdk system.
+The reduced development time will thus outweigh the disadvantages of using the CLIB calls.
+
+However it is recommended that an application use the PLIB library for at least some of its function calls.
+Although it takes time to become familiar with the PLIB library this will repay itself in the form of more compact and powerful applications.
+Furthermore use of PLIB functions is essential for accessing many features of the Sibosdk ROM software -- the enhanced graphics facilities of the Window Server for example.
+
+==== Writing the user interface
+
+A SIBO interface can be written in one of the following ways:
+
+* using console service functions such as `p_printf`, `p_getl`, and `p_puts` or their CLIB equivalents.
+These functions can only produce simple graphical output. They can be extremely useful when debugging an application.
+* using functions in the Window Server library with the contents of each window backed up with a bitmap.
+This method is capable of producing a high quality graphical display.
+* using functions in the Window Server library with the contents of each window explicitly redrawn.
+This method is capable of creating a high quality graphical display.
+Use of window redraws is more efficient than use of bitmap backups.
+
+The applications programmer does not have to learn to write applications that use the window redrawing mechanism: for many applications backing up the window with a bitmap is sufficient (the penalties of windows with backup bitmaps are much less on the HC screen than on the larger screens of some of the other SIBO computers).
+
+The applications programmer who subsequently goes on to learn about window redrawing will not have wasted his/her time learning about window bitmap backups.
+The latter provide an excellent foundation for the more complex concepts behind window redrawing.
+
+The best way to learn graphics programming on the HC is probably to follow the example programs at the end of this chapter and then extend and modify their function.
+For example one of the example programs illustrates the use of the `wInfoMsg` and `wSetBusyMsg` functions.
+These powerful graphics functions display an information message and a flashing busy message respectively at the bottom right corner of the screen.
+
+They are hardly more difficult to use than simple console functions such as `p_printf` and `p_puts`.
+Working out how this program and the others work will help to familiarise you with the more commonly
+used Window Server calls.
+
+The example programs and the discussion in this chapter should provide the would-be HC applications programmer with a sufficiently sound base to enable him/her to make effective use of the _Window Server Reference_ manual.
+
+==== Synchronous or asynchronous processing
+
+There is a class of programs in which all input to a program comes via the keyboard.
+These programs can be schematised as follows:
+
+[source,c]
+----
+Initialise();
+FOREVER
+{
+    ReadKeyFromKeyboard();
+    ProcessKey();
+}
+----
+
+The program terminates in response to a certain pre-defined key.
+Whilst waiting for a key from the keyboard, the program "hangs", i.e. it is unresponsive to other sources of input.
+In this case the hanging of the program does not matter as there are no other sources of input.
+
+The call `ReadKeyFromKeyboard` makes what is known as a _synchronous_ read for a key; it is synchronous because it does not return until the key it is waiting for has been delivered: the return of the call making the request is automatically _synchronised_ with the delivery of the key.
+
+Consider another example of _synchronous_ i/o. In this case, a program that is printing data might be
+structured (at least in part) as follows:
+
+[source,c]
+----
+Initialise();
+FOREVER
+{
+    PrepareLineToPrint();
+    SendLineToPrinter();
+}
+----
+
+This program loop terminates when there is no more data to print.
+Now the process of sending a line of data to the printer might take some time.
+The printer buffer could be full in which case the program would have to wait for the buffer to empty a bit before being able to prepare the next line for printing.
+Thus the `callSendLineToPrinter` could be synchronous (this is the way beginner programmers would tend to write the code), with the program "hanging" in the call until the printer has removed the data passed to it by the program.
+In this state, the program is, again, unresponsive to other sources of input.
+
+In either of the above examples, a simple extension of the code would require the _synchronous_ call to become _asynchronous_.
+The printing program could and should be extended to allow the user to terminate the printing while in progress by simply pressing a predefined key.
+The key-processing program could be extended so as to respond to a timer expiring (for example a signal to commence a backup procedure).
+
+Many programmers approach this kind of generalisation in an ad hoc manner resulting in spaghetti like code that is hard to debug, hard to maintain and hard to extend.
+
+Such code will usually force the user to wait while it is waiting for one or more events.
+The user can thus be shut out for significant periods of time.
+
+The software on the HC has been explicitly designed to address these issues.
+For all but the simplest of programs the concept of _asynchronous_ events is central to successful programming on the HC: would-be applications writers are strongly urged to face up to this issue squarely, from the beginning.
+This may sound daunting (and it probably _would_ be daunting, on alternative software platforms), but for two reasons, it is not:
+
+* the HC operating system software has carefully isolated the various components involved in asynchronous i/o: signals, semaphores, "status words", and "active words" (amongst others)
+* example programs in the _Fundamental Programming Guidelines_ chapter of the _General Programming Manual_ survey these components in a thorough yet straightforward manner.
+
+=== Example programs
+
+There are example programs scattered throughout the length and breadth of the SDK.
+It is recommended that, whenever possible, would-be HC applications developers should take the time to try out these examples, and to modify them.
+As in all fields, practice makes perfect -- and it is always possible to get an idea from the detail of one of these programs, which will prove helpful in a quite different coding situation.
+
+The three programs to be discussed in this chapter have particular relevance to the HC.
+They demonstrate its graphics potential, and show how to create line editors to allow convenient data entry by end users of the HC (whereas Series3 and Series3a programmers can use the Hwif library to obtain easy access to line editors and other related user interface objects, there is at the time of writing no corresponding library for the HC -- so programmers have to take care of the user interface by themselves).
+
+These examples build on those discussed in the _General Programming Manual_, and it is suggested that any readers who have not yet worked through that manual carefully should do so now, before proceeding any further.
+
+In contrast with the examples in the _General Programming Manual_, which only use console i/o, the example programs in this chapter all interact more directly with the Window Server.
+
+The source code for all these examples is located in `\sibosdk\demo`. Incidentally, these programs can also be made to run, with minor modifications, on Series3 and Series 3a machines.
+
+==== A graphics version of Hello World
+The first example is a short program stored as w_hello.c :
+
+[code,c]
+----
+#include <p_std.h>
+#include <wlib.h>
+
+GLDEF_C INT main(VOID)
+{
+    WS_EV event;
+
+    wStartup();
+    gBorder(W_BORD_CORNER_4);
+    wSetBusyMsg("Hello world",W_CORNER_BOTTOM_LEFT);
+    do
+    {
+        wGetEventWait(&event);
+    } while (event.type!=WM_KEY || event.p.key.keycode!=W_KEY_ESCAPE);
+    return(0);
+}
+----
+
+The call `wStartup` takes care of routine preparation to interact with the Window Server (see the _Window Server Reference_ manual for more details of all of these calls).
+
+The call `gBorder` draws a pleasant curved border around the edge of the screen.
+Vary the flags passed to `gBorder` for different types of curves.
+
+The call `wSetBusyMsg` displays the specified message flashing, at the nominated corner of the screen.
+In general, the message will continue to flash, without any assistance from the application, until such time as a call such a `swCancelBusyMsg` is made.
+
+The call `wGetEventWait` is asynchronous request to receive an event from the Window Server.
+These events include notification of coming into foreground or background, as well as keypresses and requests to redraw portions of the screen (these latter events are used by applications that explicitly handle window redraws -- such applications do not use the `wStartup` function and instead use the lower level function).
+
+As `wGetEventWait` is synchronous, it does not return until there is an event for the application to process.
+In this example, the application is uninterested in any events other than keypresses, and even then, only theESC keypress is of interest.
+
+In order to build `w_hello`, simply type `make w_hello` when in the appropriate source directory (`\sibosdk\demo`).
+
+==== The Gauge application
+
+The _Gauge_ application is altogether more sophisticated than `w_hello`:
+
+* the screen display contains text in various font styles.
+* the screen also contains a "growing scrollbar" or "petrol gauge" display item, whose content grows regularly, as a timer beats.
+* the speed at which the timer beats can be adjusted by keypresses from the user.
+* the user can also reset the gauge display at will.
+* the range of options open to the user is displayed on a range of "buttons", which momentarily highlight whenever they are selected.
+* in programming terms, a timer channel is created as a second event source.
+* the synchronous `wGetEventWait` call is replaced by the asynchronous version `wGetEvent`.
+
+The schematic form of `main` in `gauge.c` is as follows:
+
+[source,c]
+----
+GLDEF_C VOID main(VOID)
+{
+    WS_EV event;
+    WORD wactive;
+
+    wStartup();
+    INITIALISE();
+
+    QueueTimer();
+    wactive=FALSE;
+    FOREVER
+    {
+        if (wactive)
+        {
+            wFlush();
+        }
+        else
+        {
+            wGetEvent(&event);
+            wactive=TRUE;
+        }
+        p_iowait();
+        if (event.type==E_FILE_PENDING)
+        {
+            PROCESS_TIMER_EVENT();
+            QueueTimer();
+            continue;
+        }
+        wactive=FALSE;
+
+        if (event.type==WM_KEY)
+        {
+            switch (event.p.key.keycode)
+            {
+            ....
+            }
+        }
+    }
+}
+----
+
+The use of a little imagination will make it clear that this is the same basic architecture (albeit rearranged)
+as in the _Events_ programs discussed in the _General Programming Manual_:
+
+* the variable `wactive` is the active word for the Window Server event source
+* the status word for the Window Server event source is built into theWS_EV struct passed to the call `wGetEvent`: it is the `event.type` field
+* there is no test on the timer status word, `timestat`, since if the call to `p_iowait` has returned and `event.type` is still equal to `E_FILE_PENDING`, it can only be the timer which has an event to deliver (given that there are only two event sources in the application).
+
+==== The need to flush the Window Server buffer
+
+Note the special test on `wactive` at the top of the event loop in `main`. If `wactive` is still `TRUE`, it means there is no need to call `GetEvent` again (and in fact the application would be panicked if it did so).
+However, it is necessary, in this case, to call `wFlush`, to ensure that the Window Server function buffer is flushed out.
+Otherwise drawing calls could remain in this buffer all the time that the application is suspended, inside `p_iowait`.
+
+The point here is that, for efficiency (minimising IPC - InterProcess Communication - traffic between the application and the Window Server), many Window Server functions are not implemented immediately: rather, they are stored in a buffer which is only "flushed" every so often. See the _Window Server Reference_ manual for full details.
+
+Another instance in the _Gauge_ application where `wFlush` is called is in the routine `Flash`, in which a highlight is momentarily displayed over a "button" containing the choice the user has just selected:
+
+[source,c]
+----
+{
+    P_EXTENT ext;
+
+    ...
+    gInvObloid(&ext);
+    wFlush();
+    p_sleep(2);
+
+    gInvObloid(&ext);
+}
+----
+
+==== Other graphics calls in Gauge
+
+The contents of `gauge.c` can usefully be studied (eg use the SIBO Debugger while the program is running)
+for examples of the following graphics function calls:
+
+[cols="1m,3"]
+|---
+|gPrintBoxText
+|useful for "flicker free" drawing of text.
+
+|gSetGC
+|allows a change in the font or font style (and more besides) used to draw text.
+
+|gClrRect
+|clears or highlights a given rectangle.
+
+|gFillPattern
+|applies a pattern (here, a "grey" pattern) to an area.
+
+|gTextWidth
+|calculates the width of a string of text.
+
+|gInvObloid
+|allows special "rounded" or "obloid-shaped" inverse videoing.
+
+|gBorderRect
+|draws any of a variety of curves around the edge of a specified rectangle.
+|---
+
+==== A suite of line editor functions
+
+The application `LinEd` demonstrates the use of a suite of line editor functions: three line editors are created on the screen, each with text that the user can edit.
+The user chooses which entry to edit at any one time by using the kbd:[UP] and kbd:[DOWN] cursor keys.
+Other editing keys have the expected effects on the editors:
+
+* typing printable characters enters these characters into the current string (with any existing highlighted selection in the string being deleted).
+* the editor beeps if it has already grown to its maximum size.
+* the editor scrolls horizontally if there are more characters to display than can fit in the width allocated to it on the screen.
+* the kbd:[DEL] key deletes the character to the left of the cursor, whereas kbd:[SHIFT+DEL] deletes the character to the right of the cursor. kbd:[PSION+DEL] deletes to the end of the line.
+* kbd:[PSION+LEFT] and kbd:[PSION+RIGHT] "home" and "end" the cursor, respectively, kbd:[LEFT] and kbd:[RIGHT] just move the cursor one position.
+
+The suite of "lined" (line editor) functions should be independently useful, either in their present form, or modified for particular purposes (the lined functions are as they stand fairly general).
+From a broader perspective, the lined functions demonstrate the creation of a user interface for applications on the HC.
+
+The code in `lined.c` divides into two parts: the implementation of the lined functions, and the testing of
+these functions.
+The `main` routine of the test program is worth considering in full:
+
+[source,c]
+----
+GLDEF_C VOID main(VOID)
+{
+    LINED *ed[3];
+    INT which;
+    WS_EV event;
+    INT keycode;
+
+    wStartup();
+    gBorder(W_BORD_CORNER_4);
+    ed[0]=CreateLined(10,"One",TRUE);
+    ed[1]=CreateLined(30,"Two",FALSE);
+    ed[2]=CreateLined(50,"Three",FALSE);
+    which=0;
+    FOREVER
+    {
+        do
+        {
+            wGetEventWait(&event);
+        } while (event.type!=WM_KEY);
+
+        keycode=event.p.key.keycode&(~W_SPECIAL_KEY);
+        switch (keycode)
+        {
+            case W_KEY_ESCAPE:
+                if (event.p.key.modifiers==W_PSION_MODIFIER)
+                {
+                    p_exit(0);
+                }
+            case W_KEY_UP:
+                if (which)
+                {
+                    le_emphasise(ed[which--],FALSE);
+                    le_emphasise(ed[which],TRUE);
+                }
+                break;
+            case W_KEY_DOWN:
+                if (which<2)
+                {
+                    le_emphasise(ed[which++],FALSE);
+                    le_emphasise(ed[which],TRUE);
+                }
+                break;
+            default:
+                le_key(ed[which],keycode,event.p.key.modifiers);
+        }
+    }
+
+}
+----
+
+The array of three pointers `ed[3]` is used to hold the "handles" of the three lined objects created.
+This creation is done inside the `CreateLined` (further discussed below).
+At any one time, only one of these three editors is "active" -- displaying a flashing cursor and receiving editing keys from the user.
+The application uses the variawhich to keep track of the current active editor.
+
+On receipt of an kbd:[UP] or kbd:[DOWN] key, the application changes its record of which editor is active.
+At the same time, the editors themselves have to be informed of this change -- so that they can adjust their appearance.
+This is the role of the calls to `le_emphasise`.
+
+All other keys (apart from kbd:[PSION+ESC], which exits the application) are passed straight through to the current editor, using the `le_key`.
+
+==== Full specification of the lined functions
+
+The routine `le_init` creates and initialises a lined object, according to the data in an `IN_LINED` struct passed.
+This creation involves two separate allocator calls -- one for the control block of the editor itself, and one for the buffer to hold the string of text to be edited.
+Note that either of these calls can fail -- in which case the failure is reported back to the caller.
+The test application in `lined.c` gnores this possibility, under the rationale that the minimum heap of the application guarantees that these calls, made during program initialisation, will always succeed.
+
+The call either returns `NULL`, in the case of an alloc failure, or the handle to be used to identify this particular editor in all subsequent `le_xxx` calls.
+
+The meanings of the fields in the interface struct `IN_LINED` (defined in `lined.h`) are as follows:
+
+[cols="1m,3"]
+|---
+|maxchars
+|the maximum length of text that can be edited.
+
+|winid
+|the id of the window in which the editor is to appear.
+
+|xoff
+|the x-offset from the origin of the window to the top left of the editor (in pixels).
+
+|yoff
+|the y-offset from the origin of the window to the top left of the editor (in pixels).
+
+|width
+|the width of the editor (in pixels).
+
+|height
+|the height of the editor (in pixels).
+
+|asc
+|the distance (in pixels) between the top of the editor and the base line of the text edited.
+
+|font
+|the identifier of the font used to display the text.
+
+|style
+|the style of the font used to display the text.
+
+|autoselect
+|`TRUE` to automatically select the entirety of any text set into the editor by the calling program, `FALSE` to leave such text un-selected.
+|---
+
+Note how these fields are set up in the routine `CreateLined`:
+
+[source,c]
+----
+LOCAL_C LINED *CreateLined(INT yoff,TEXT *msg,INT emph)
+{
+    IN_LINED init;
+    LINED *ed;
+
+    init.maxchars=20;
+    init.winid=wMainWid;
+    init.xoff=10;
+    init.yoff=yoff;
+    init.width=80;
+    init.height=10;
+
+    init.asc=8;
+    init.font=WS_FONT_BASE+4;
+    init.style=0;
+    init.autoselect=TRUE;
+    ed=le_init(&init);
+    le_set_text(ed,p_slen(msg),msg);
+    le_emphasise(ed,emph);
+    le_visible(ed,TRUE);
+    return(ed);
+}
+----
+
+The static `wMainWid` is one that is set up by the call `wStartup`. See the _Window Server Reference_ manual.
+
+The initial text of the editor is set in by a call `le_set_text` made after the call to `le_init`, but before the call to `le_visible` which causes the editor to actually be drawn. Also in between the `le_init` and `le_visible` calls is a call to `le_emphasise` to specify whether the editor should be displaying a flashing cursor (and also whether any selected region should be visibly highlighted).
+
+Another call that could be made between `le_init` and `le_visible` is `le_set_cwidth`, to change the width of the flashing cursor from its default (which is two pixels wide).
+
+As noted above, the way the application sets text into a lined object is with the call `le_set_text`. In this implementation, the application is required to specify the length of the string as a parameter to `le_set_text` -- ie there is no requirement to pass the string in zero-terminated form.
+
+On the other hand, the editor itself maintains the string, as it is edited, in zero terminated form -- which may be convenient for the application.
+
+The way the application can "sense" the contents of the string, as edited by the user, is simply to read this string out from the data maintained by the lined object.
+For this purpose, the form of the `LINED` struct needs to be known.
+This struct is defined in `lined.h`. Needless to say, most parts of the data in this struct are strictly read-only.
+If an application writes directly into this data, random problems can ensue later.
+
+If a lined object is no longer needed, all the memory it uses can be freed by calling `le_destroy`.
+Be sure to have an independent copy of the string edited, before making this call.
+
+Finally, the function `le_visible`, as well as initially making the editor visible, can also be used at some later stage to "hide" the editor again, if desired.
+
+=== General comments
+
+==== Device drivers for the HC
+
+Note that the _i/o Devices Reference_ manual gives details of how to program many of the peripherals that can be attached to an HC:
+
+* a parallel port.
+* a serial port (including xmodem and ymodem file transfer).
+* a magnetic card reader.
+* a bar code reader.
+* a modem.
+
+The chapter _The HC in the Cradle_, later in this manual, gives details of the operation of the HC when located in a cradle.
+
+==== Writing a customised shell process
+
+The _System startup_ section of the _Introduction_ chapter of the _Window Server Reference_  manual gives two examples of possible small alternative shell programs.
+The source for one of these, `lkshell.c`, may be found in `\sibosdk\demo`. As well as presenting the source, this section of the SDK raises various issues to do with replacing the built-in shell program with a customised one.
+
+In case it is desired to create a shell process with functionality intermediate between `lkshell` and `corpshll` (which is the Command Shell), see the documentation, later in this manual, of each keyword supported by the Command Shell, for a reference to the C functions used to implement that keyword.
+
+==== Developing applications on restricted-keyboard HCs
+
+Developers writing for HCs with restricted keyboards lacking a full set of alphabetic keys face the problem that many commands that might ordinarily be typed into an HC during the course of program development -- for example, file or SSD management commands in the HC Command Shell -- simply cannot be typed into the HC, on account of the required alphabetic keys not being present on the keyboard.
+
+In practice, preliminary development would probably be done using a different HC, with a fuller complement of keys.
+The program being developed would only be transferred to the restricted-keyboard HC at a later stage of development.
+However, the problem recurs at this later stage.
+
+The comprehensive solution to this problem involves one of the fundamental principles of the HC -- its interconnectability with other computers.
+Briefly, rather than the HC being controlled from its own keyboard, it can be controlled _from a remote keyboard_, say that of a PC.
+The commands are transmitted to the HC via one or other form of serial connection.
+
+See the chapter _HC Command Shell_ for more details of this mechanism.

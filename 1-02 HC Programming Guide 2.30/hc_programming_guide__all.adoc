@@ -26,3 +26,4 @@ Brief is a registered trademark of Underware Inc.
 Psion PLC acknowledges that some other names referred to are registered trademarks.
 
 include::hc_programming_guide_ch01.adoc[]
+include::hc_programming_guide_ch02.adoc[]
