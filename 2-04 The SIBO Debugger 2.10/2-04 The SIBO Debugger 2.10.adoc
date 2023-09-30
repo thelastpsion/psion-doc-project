@@ -241,7 +241,7 @@ starts up the debugger to debug processes on the local machine, without loading 
 
 will load the (local) image file `print.img` to run on the local machine.
 
-[code,console]
+[source,console]
 ----
 sdbg -p2 -b19200 print.ing “This is a remote print”
 ----

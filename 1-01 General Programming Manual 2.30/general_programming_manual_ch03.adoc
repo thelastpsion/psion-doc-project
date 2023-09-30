@@ -93,7 +93,7 @@ Evidently, the program prints the message Hello World onto the screen, waits for
 Before `hello.c` can be compiled and linked, a project file needs to be specified.
 In this case, the following (`hello.pr`) suffices:
 
-[code]
+[source]
 ----
 #system epoc img
 #model small jpi

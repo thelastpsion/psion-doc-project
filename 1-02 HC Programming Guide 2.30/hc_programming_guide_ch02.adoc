@@ -197,7 +197,7 @@ The source code for all these examples is located in `\sibosdk\demo`. Incidental
 ==== A graphics version of Hello World
 The first example is a short program stored as w_hello.c :
 
-[code,c]
+[source,c]
 ----
 #include <p_std.h>
 #include <wlib.h>

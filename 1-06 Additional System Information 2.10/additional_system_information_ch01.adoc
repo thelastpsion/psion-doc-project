@@ -47,7 +47,7 @@ If your PC has only one floppy disk drive (currently referenced as “`A:`”), 
 
 To avoid this, use the MS-DOS `ASSIGN` command before running the MCLINK program, like this:
 
-[code,batch]
+[source,batch]
 ----
 ASSIGN B=A
 ----
@@ -74,7 +74,7 @@ In order to make full use of the file-handling commands of `MCLINK`, various rul
 
 In MCLINK the syntax of full filenames on the PC, MC, MC or Series 3 is:
 
-[code,]
+[source,]
 ----
 filing system::device:\directory\sub-directory\file.extension
 ----
@@ -100,14 +100,14 @@ When specifying a directory or sub-directory in the file-handling commands, make
 Otherwise the directory name will be taken as a filename.
 So:
 
-[code,batch]
+[source,batch]
 ----
 COPY A:\*.* REM::\LETTERS
 ----
 
 is wrong -- it would try to copy the files in the root directory of `A:` to the file `LETTERS`.
 
-[code,batch]
+[source,batch]
 ----
 COPY A:\*.* REM::\LETTERS\
 ----
