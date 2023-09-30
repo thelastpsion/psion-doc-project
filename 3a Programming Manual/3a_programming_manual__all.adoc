@@ -1,0 +1,25 @@
+= 3A PROGRAMMING MANUAL
+include::../defaults.adoc[]
+
+[colophon]
+== Colophon
+*(C)Copyright Psion PLC 1990-98*
+
+All rights reserved.
+This manual and the programs referred to herein are copyrighted works of Psion PLC, London, England.
+Reproduction in whole or in part, including utilization in machines capable of reproduction or retrieval, without express written permission of Psion PLC, is prohibited.
+Reverse engineering is also prohibited.
+
+The information in this document is subject to change without notice.
+
+Psion and the Psion logo are registered trademarks, and Psion, Psion MC, Psion HC, Psion Series 3, Psion Series 3a, Psion Series 3c, Psion Siena and Psion Workabout are trademarks of Psion PLC.
+TopSpeed is a registered trademark of Clarion Software Corporation.
+IBM, IBM XT and IBM AT are registered trademarks of International Business Machines Corp.
+Microsoft and MS-DOS are registered trademarks of Microsoft Corporation.
+Apple and Macintosh are registered trademarks of Apple Computer Inc.
+VAX and VMS are registered trademarks of Digital Equipment Corporation.
+Brief is a registered trademark of Underware Inc.
+Psion PLC acknowledges that some other names referred to are registered trademarks.
+
+include::3a_programming_manual_ch01.adoc[]
+include::3a_programming_manual_ch02.adoc[]

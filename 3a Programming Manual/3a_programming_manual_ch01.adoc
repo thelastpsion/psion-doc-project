@@ -1,0 +1,301 @@
+== Creating and running programs
+
+====
+There are 3 stages to producing a program using OPL, the Series 3a programming language:
+
+* _Type in the program_, using the Program editor (the Program icon on the System screen).
+
+* _Translate_ the program.
+This makes a new version of your program in a format which the Series 3a can "run".
+
+* _Run_ the program.
+If it does not work as you had intended, re-edit it, then translate and run it again.
+
+This chapter guides you through these stages with a simple example.
+If you wish to follow the example, note that each instruction for you to do something is numbered.
+====
+
+NOTE: The example programs in the first few chapters do not include full error handling.
+This keeps the programs short and easy to understand.
+But it means that when you run one of these programs and, for example, fail to type in the kind of value which the program asks for, the program may fail harmlessly stopping before it completed.
+As you develop your own programs, you should usually add some error handling code to them.
+A later chapter gives a full explanation of error handling.
+
+
+=== Creating a new module
+
+As well as the word program, you'll often see the word module used.
+The terms program and module are used almost interchangeably to describe each OPL file you say "OPL *module*" like you might say "Word Processor *document*".
+
+Create a new module and give it a name:
+
+1. Move to the Program icon on the System screen, and select *New file* from the *File* menu.
+
+2. Type `test` as the name to use for this OPL module and press Enter.
+You will move into the Program editor.
+
+Module names can be up to 8 characters long, like other filenames on the Series 3a.
+The names can include numbers, but must start with a letter.
+
+It's always best to choose a name that describes what the module does.
+Then, when you've written several modules, you can still recognise which is which.
+
+==== Inside the Program editor
+
+When you first move into the Program editor you will see that `PROC :` has already been entered on the first line, and `ENDP` on the third.
+
+`PROC` and `ENDP` are the keywords that are used to mark the start and end of a procedure.
+Larger modules are broken up into procedures, each of which has one specific function to perform. 
+A simple OPL module, like the one you are going to create, consists of only one procedure.
+
+A procedure consists of a number of statements -- instructions which the Series 3a acts upon. 
+You type these statements, in order, between `PROC :` and `ENDP`. 
+When you come to run the program, the Series 3a goes through the statements one by one.
+When the last statement in the procedure has been acted upon and `ENDP` is reached, the procedure ends.
+
+You can type and edit in the Program editor in much the same way as in the Word Processor, except that text you type does not word-wrap; you should press *Enter* at the end of each statement.
+Note also that the Program editor does not offer text layout features such as styles and emphases.
+
+NOTE: You can use upper or lower case letters when entering OPL keywords.
+
+=== An example procedure to type in
+
+The next few pages work with this example procedure:
+
+[opl,code]
+----
+PROC test:
+  PRINT "This is my OPL program"
+  PAUSE 80
+  CLS
+  PRINT "Press a key to finish"
+  GET
+ENDP
+----
+
+This procedure does nothing of any real use it is just an example of how some common OPL keywords (`PRINT`, `PAUSE`, `CLS` and `GET`) are used.
+(The procedure first displays `This is my OPL program` on the screen.
+After a few seconds this is replaced by `Press a key to finish`.
+Then, when you press a key, the program finishes.)
+
+=== Type in and edit the procedure
+
+Before you type the statements that constitute the procedure, you must type a name for it, after the word `PROC`.
+The flashing cursor is automatically in the correct place (before the colon) for you to do this.
+You can choose any name you like (with the same restrictions as when entering the filename earlier).
+For simple procedures which are the only procedure in a module, you might use the same filename you gave the module.
+
+1. Type `test`.
+The top line should now read `PROC test:`.
+
+2. Press kbd:[&darr;].
+The cursor is already indented, as if the Tab key had been pressed.
+
+You can now type the statements in this procedure:
+
+[start=3]
+3. Type `PRINT "This is my OPL program"`.
+(Note the space after `PRINT`.)
+Press *Enter* at the end of the line.
+
+Each new line is automatically indented, so you don't need to press the Tab key each time.
+These indents are not obligatory, though as you'll see, they can make a procedure easier to read.
+*However, other spacing -- such as the space between `PAUSE` and `80` is essential for the procedure to work properly.*
+
+[start=4]
+4. Type the other statements in the procedure.
+Press *Enter* at the end of each line.
+You are now ready to translate the module and then run it.
+
+When you are entering the statements in a procedure you can, if you want, combine adjacent lines by separating them with a space and colon.
+For example, the two lines:
+
+[opl,code]
+----
+PAUSE 80
+CLS
+----
+
+could be combined as this one line:
+
+[opl,code]
+----
+PAUSE 80 :CLS
+----
+
+You can, of course, use the other Series 3a applications at any time while you are editing an OPL module.
+Use kbd:[Ctrl+Word] (hold down the Control key and press the Word button) to return to the Program editor to continue editing your program.
+
+==== What the keywords do when the program runs
+
+`PRINT` -- takes text you enter between quote marks, and displays it on the screen.
+The text to be displayed, in the first statement, is `This is my OPL program`.
+
+`PAUSE` -- pauses the program, for a specified number of twentieths of a second.
+`PAUSE 80` waits for 4 seconds.
+(`PAUSE 20` would wait for 1 second, and so on.)
+
+`CLS` -- clears the screen.
+
+`GET` -- waits for you to press a key on the keyboard.
+
+=== Translating a module
+
+The translation process makes a separate version of your program in a format which the Series 3a can run.
+
+You'd usually try to translate a module as soon as you finish typing it in, to check for any typing mistakes you've made, and then to see if the program runs as you intended.
+
+1. Select the *Translate* option from the *Prog* menu.
+
+NOTE: The *Prog* menu also has a *S3 translate* option, for translating the current program in a form which can run on a Psion Series 3 (as opposed to a Series 3a).
+
+==== What happens when you translate a module?
+
+*_First: the procedures in the module are checked for errors._*
+
+If the Series 3a cannot understand a procedure, because of a typing error, a message is shown, such as "Syntax error".
+The cursor is positioned at the point where the error was detected, so that you can correct it.
+For example, you might have typed `PRONT "This is..."`, or `PAUSE80` without the space.
+
+When you think you've corrected the mistake, select *Translate* from the *Prog* menu again.
+If there is still a mistake, you are again taken back to where it was detected.
+
+NOTE: If you've already used up almost all of the memory, the Series 3a may be unable to translate the program, and will report a 'No system memory' message.
+You'll need to free some memory, as described in the _Troubleshooting_ chapter of the _User Guide_, before trying again.
+
+*_When 'Translate' can find no more errors, the translation will succeed, producing a separate version of your module in a format which the Series 3a can run._*
+
+There may still be errors in your program at this point because there are some errors which cannot be detected until you try to run the program.
+
+==== Running after translating
+
+When your module translates successfully, the *Run program* dialog is displayed, asking whether to run the translated module.
+You'd usually run it straight away in order to test it.
+
+NOTE: Running a module does require some free memory, so again a "No system memory" message is possible.
+
+1. Press kbd:[Y] to run the module; the screen is cleared, and the module runs.
+
+When the module has finished running, you return to the Program editor, with the cursor where it was before.
+
+If an error occurs while the module is running, you will return to editing the module, with the cursor at the point where the error occurred.
+
+=== File management
+
+==== New OPL modules
+
+You can create new OPL modules in the same way as new Word Processor documents.
+Use the *New File* option in the Program editor, or move to the *Program* icon in the System screen and use its *New File* option.
+
+Your module names are listed below the Program icon.
+The word *Program* is shown below the icon if there are no modules at all.
+
+The names under the RunOpl icon are those modules which have been translated successfully.
+
+To re-edit an existing OPL program, use the *Open file* option in the Program editor, or move to the *Program* icon in the System screen and select the filename from the list.
+
+==== Copying modules
+
+Use the *Copy file* option in the System screen to copy modules (or translated modules).
+See the User Guide for full details.
+You can also use the *Save as* option in the Program editor itself, to make new copies of an OPL module.
+
+==== Deleting modules
+
+You can delete an OPL module (or a translated version) as you would any other file -- go to the System screen, move the highlight onto the file and use the *Delete file* option.
+
+NOTE: If you delete all of your translated modules, the RunOpl icon will remain on the System screen, with the word *RunOpl* beneath it.
+
+==== 'File or device in use'
+
+If you see a 'File or device in use' error message when deleting or copying an OPL module, the file is open -- it is currently being edited in the Program editor.
+Exit the file, eg with the Delete key in the System screen, then try again.
+
+If it's the translated file you're trying to delete or copy, 'File or device in use' means that the translated file is currently running.
+Stop the running program by pressing kbd:[Ctrl+Calc] (to go to the running program) then kbd:[Psion+Esc] (to stop it), and then you can try again.
+
+=== More about running modules
+
+==== Running from the Program editor
+
+You can run a module at any time from within the Program editor, by selecting *Run* from the *Prog* menu.
+This runs the *translated* version of your program; if you've made changes to the module and haven't translated it again, you must translate the module again, or the changes have no effect.
+
+*Run* displays a dialog, letting you select the name of *any* translated module which you want to run.
+
+==== Running modules from the System screen
+
+The names of any successfully translated programs automatically appear under a new icon in the System screen.
+The icon is just the word "OPL" in a speech bubble, and is called the *RunOpl* icon.
+It appears at the right-hand end of the list of icons (past the Program icon), and is usually off the right-hand edge of the screen.
+Just move the highlight onto the name of the translated program you want to run, and press kbd:[Enter].
+
+Like the Program editor, RunOpl is assigned a keypress -- you can press kbd:[Ctrl+Calc] (hold down *Control* and press the *Calc* button) as the short-cut to move to the RunOpl icon, whatever you're doing.
+(If there is a running program, this instead moves *directly* to it.)
+
+When an OPL module has been successfully translated and run, you will usually run it from the System screen.
+While you're still editing and testing, however, it's quicker to run it from inside the Program editor.
+This also positions the cursor for you, if errors occur.
+
+==== Stopping a program while it's running
+
+*To stop a running program, press kbd:[Psion+Esc].*
+(If you've gone away from the running program it will still be running, and you must first return to it -- perhaps by pressing kbd:[Ctrl+Calc] and/or selecting it from under the RunOpl icon in the System screen -- before pressing kbd:[Psion+Esc].)
+
+*To pause a running program, press kbd:[Ctrl+S].*
+It will be paused as soon as it next tries to display something on the screen.
+Press any other key to let the program resume running.
+
+==== Displaying a status window
+
+A temporary status window is always available while an OPL program is running.
+Press kbd:[Psion+Menu] to see it.
+As you'll see, there are keywords for displaying a status window yourself.
+
+==== Looking at a running program
+
+If you translate and run a module from the Program editor, the kbd:[Ctrl+Word] keypress will still return to the Program editor, even if the translated program has not finished running.
+A 'Busy' message is shown -- you can move the cursor around the program as normal, but you can't edit it.
+
+To return to the running version, select it from beneath the RunOpl icon in the System screen.
+It will be in bold, at the top of the list, to show that it is currently running.
+Alternatively, press kbd:[Ctrl+Calc].
+
+==== Running more than one module
+
+If a module is running, and you select a second one from the System screen, the first one is *not* replaced -- both modules run together, and will be in bold on the file list.
+kbd:[Ctrl+Shift+Calc] swaps between them.
+
+=== Menu options while editing
+
+While you're typing in the procedure, all the options on the *Edit* menu -- such as *Copy text* and *Insert text* -- are available and can be used as in the Word Processor.
+Refer to the chapter on the Word Processor in the User Guide for more information.
+
+The menus available are the same as in the Word Processor, except that the 'Word' menu has been replaced by the *Prog* menu.
+The *Prog* menu has options for translating and running the current program.
+It also has a *Show error* option, to re-display an error which prevented successful translation, and an *Indentation* option, for setting the tab width and to turn auto-indentation on and off in the Program editor.
+
+Unlike the Word Processor, the Program editor only ever uses one template for creating new files, called 'default'.
+When you use the *New file* option, the *Use template* line is therefore unavailable; the new file is created using the 'default' template automatically.
+If you wish to change the 'default' template, you can use the *Save as template* option to replace it with the current file.
+*Do not try to swap templates between the Word Processor and the Program editor.*
+
+*Set preferences* allows you to choose between bold/normal and mono/proportional text.
+It also has options for showing tabs, spaces, paragraph ends, soft hyphens and forced line breaks.
+
+There is no 'Password' option.
+
+==== The DIAMOND (diamond) key
+
+The *DIAMOND* key allows you to switch between a 'Normal' and an 'Outline' view of your OPL module.
+The 'Outline' view lists only the names of each procedure, for quick navigation around the module.
+
+
+=== SUMMARY
+
+* Move to the Program icon in the System screen and select the *New file* option.
+* Type in your procedure.
+* Select 'Translate' from the 'Prog' menu.
+
+When a module translates correctly you are given the option to run it.
+You can run it again at any time, either with the menu:Prog[Run] menu item, or directly from the RunOpl icon in the System screen.
