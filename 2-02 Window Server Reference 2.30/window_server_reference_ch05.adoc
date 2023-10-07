@@ -1,0 +1,988 @@
+== EVENTS
+
+=== Getting the next event
+
+==== `wGetEventWait` Wait for an event
+
+[source,c]
+----
+VOID wGetEventWait(WS_EV *event);
+----
+
+Wait for a window server event and return with the event type and parameters written to the `WS_EV` struct at address event where `WS_EV` is defined as:
+
+[source,c]
+----
+typedef struct
+{
+    WORD type;
+    UWORD handle;
+    UWORD time;
+    WS_EVENT_UNION p;
+} WS_EV;
+----
+
+where:
+
+[cols="1m,3"]
+|===
+|type
+|is the positive event type of the form `WM_xxxx` 
+
+|handle
+|For events that are directed at a window (eg `WM_REDRAW`, `WM_MOUSE`), this is the handle that was specified to `wCreateWindow`.
+For events that are not directed at a window (eg `WM_KEY`, `WM_FOREGROUND`), it is set to the value specified to `wConnect`.
+
+|time
+|is set by key and mouse events.
+It gives the low order word of the system tick count (a tick is 1/32 of a second) when the event occurred.
+It may be used, for example, to detect double clicks.
+
+|p
+|is a union of event type-dependent parameters
+|===
+
+The `WS_EVENT_UNION` union is defined as:
+
+[source,c]
+----
+typedef union
+{
+    UWORD uword;
+    UBYTE *dpoint;
+    P_RECT rect;
+    WMSG_KEY key;
+    WMSG_MOUSE mouse;
+    WMSG_RUBBER rubber;
+    WMSG_CAPS caps;
+} WS_EVENT_UNION;
+----
+
+These event-specific parts are described under the description of the associated event type, in the course of this chapter.
+
+==== `wGetEvent` Asynchronously request an event
+
+[source,c]
+----
+VOID wGetEvent(WS_EV *event);
+----
+
+Request an event from the window server and return without waiting for the request to complete.
+This is the asynchronous version of `wGetEventWait`.
+For more information on asynchronous events, see the chapter _Asynchronous Requests and Semaphores_ in the _PLIB Reference_ manual.
+
+Calling `wGetEvent` initially sets event->type to `E_FILE_PENDING` to indicate that no event has yet arrived.
+When there is an event to deliver, the window server sets `event->type` to the event type and also sets the rest of event as appropriate for `event->type`. 
+It then signals the caller's I/O semaphore.
+
+Only one `wGetEvent` may be outstanding at a time.
+The window server panics the process if a second `wGetEvent` is called when one is already pending.
+
+==== `wGetEventSpecial` Asynchronously request selected events
+
+[source,c]
+----
+VOID wGetEventSpecial(WS_EV *event,UINT flags);
+----
+
+Introduced in version 4 of the window server, this is an enhanced version of the function `wGetEvent`, where the `flags` parameter is used to select which type of event(s) the window server is to deliver.
+
+There can only be one call outstanding to either `wGetEvent` or `wGetEventSpecial` at any one time.
+
+To change the type of event(s) selected in an outstanding `wGetEvent` or `wGetEventSpecial`, use the function `wGetEventUpdate`.
+
+The following flags can be used to select the corresponding events. They can be ORed together:
+
+[cols="1m,3"]
+|===
+|WE_KEY
+|Selects key and task key events
+
+|WE_REDRAW
+|Selects `WM_REDRAW` events
+
+|WE_STATUS
+|Selects the `WM_FOREGOUND`, `WM_BACKGROUND` and `WM_ON` events
+
+|WE_MOUSE
+|Selects mouse and rubber band events
+
+|WE_OTHERS
+|Selects all events other than those listed above.
+
+|WE_NORMAL
+|Selects _all_ of the above events
+
+|WE_ESC
+|This is only relevant when `WE_KEY` is _not_ set.
+If the kbd:[ESC] key is pressed, the keyboard buffer is thrown away and a `WM_ESCAPE` event is delivered to the application.
+|===
+
+Note that calling `wGetEventSpecial` with the `WE_NORMAL` flag set is equivalent to calling `wGetEvent`.
+
+==== `wGetEventUpdate` Change event types selected
+
+[source,c]
+----
+VOID wGetEventUpdate(UINT flags);
+----
+
+Introduced in version 4 of the window server, this function modifies the type of event(s) that the window server is to deliver where there is an outstanding `wGetEvent` or `wGetEventSpecial` call.
+
+The previously selected event type(s) are discarded and replaced with a new set as specified in the flags parameter.
+The possible values for flags are the same as those described in `wGetEventSpecial`.
+
+Note that if there is no outstanding call to either `wGetEvent` or `wGetEventSpecial` then calling `wGetEventUpdate` will have no effect.
+
+=== Event types
+
+This section describes event types that are common to more than one machine type.
+
+The following descriptions assume that event is declared as:
+
+[source,c]
+----
+WS_EV event;
+----
+
+==== `WM_KEY` Key press event
+
+Sent when a key is pressed where the key press is described by the `WMSG_KEY` struct `event.p.key` where `WMSG_KEY` is defined as:
+
+[source,c]
+----
+typedef struct
+{
+    UWORD keycode;   /* Code for the key pressed */
+    UBYTE modifiers; /* State of mouse button, shift keys etc */
+    UBYTE count;     /* Used to accumulate auto-repeat counts */
+} WMSG_KEY;
+----
+
+===== Count
+
+For single key presses, `event.p.key.count` is 1.
+
+If a key is held down, `count` will get to be greater than 1 when the client is unable to process keys at the rate at which the system generates repeated keys.
+
+As described in the _Keyboard input_ section of the first chapter, application programmers are best advised just to ignore the repeat count.
+
+
+===== Modifiers
+
+`event.p.key.modifiers` is a set of bit flags:
+
+[cols="1m,3"]
+|===
+|W_SHIFT_MODIFIER (0x02)
+|SHIFT key down
+
+|W_CTRL_MODIFIER (0x04)
+|CTRL key down
+
+|W_PSION_MODIFIER (0x08)
+|PSION key down
+
+|W_CAPS_MODIFIER (0x10)
+|caps lock on
+
+|W_NUM_LOCK_MODIFIER (0x20)
+|num lock on (MC only)
+|===
+
+===== Keycode
+
+When a "standard" key that represents a character from the SIBO character setfootnote:[Similar to IBM's code page 850 -- see the section _Text Fonts_ in the first chapter.]
+is pressed, `event.p.key.keycode` contains the character code of the corresponding character in the range `0x20` to (nominally) `0xff` but excluding `0x7f`.
+The actual upper limit on the code which can be directly produced from the keyboard is less than 0xff and depends on what language (eg French, German) the keyboard is produced for.
+
+The kbd:[SHIFT] and kbd:[CAPS LOCK] keys modify the keycode following the normal conventions and as suggested by the labelling of the key.
+
+In most cases on the HC and MC and for those keys that are used as accelerators on the S3 and S3a, the kbd:[PSION] shift key produces a `keycode` that is generated by adding `0x200` (`W_SPECIAL_KEY`) to the unshifted `keycode` with caps lock off.
+For example, pressing kbd:[PSION+A] with or without kbd:[CTRL] and kbd:[SHIFT] and regardless of the caps lock state produces a keycode of `0x261` (the code for lower case 'a' plus `W_SPECIAL_KEY`).
+
+On machines which have a kbd:[CTRL] key (that is, excluding the HC), you can generate any keycode from `0x00` to `0xff` indirectly by holding down the kbd:[CTRL] key and typing the required code as a 3-digit decimal number (using leading zeros as necessary).
+In this case, a single key event is generated after the third decimal number is pressed.
+Also, following normal conventions, pressing kbd:[CTRL+A] to kbd:[CTRL+Z] produces a keycode from `0x01` to `0x1a`.
+
+Many of the keys do not represent printable characters from the SIBO character set (these keys are sometimes called "special keys").
+Such keys generate a `keycode` which is either less than `0x20`, 0x7f or greater than `0xff`.
+
+The following lists the key codes produced by the special keys:
+
+[cols="1m,3"]
+|===
+|W_KEY_TAB (0x9 or '\t')
+|Produced by kbd:[TAB], with or without kbd:[SHIFT] or kbd:[CTRL].
+On the HC and MC only, the kbd:[PSION] key adds `W_SPECIAL_KEY`.
+On the Work__about__, the kbd:[PSION] key (but not kbd:[SHIFT+PSION]) converts the keypress to `W_KEY_TASK`.
+
+|W_KEY_DELETE_LEFT (0x08 or '\b')
+|Produced by kbd:[DEL] on the HC, kbd:[DELETE] with or without kbd:[CTRL] or kbd:[PSION] on the S3 and S3a, kbd:[BACKSPACE] with or without kbd:[SHIFT] or kbd:[CTRL] on the MC, and kbd:[DEL] without kbd:[SHIFT] on the Work__about__.
+On the HC and MC, the kbd:[PSION] key adds `W_SPECIAL_KEY`.
+
+|W_KEY_DELETE_RIGHT (0x7f)
+|Produced by kbd:[SHIFT+DEL] on the HC and Work__about__, kbd:[SHIFT+DELETE] on the S3 and S3a, kbd:[DELETE] with or without kbd:[SHIFT] or kbd:[CTRL] on the MC.
+On the MC only, the kbd:[PSION] key adds kbd:[W_SPECIAL_KEY].
+
+|W_KEY_RETURN (0x0d or '\r')
+|Produced by kbd:[ENTER], with or without kbd:[SHIFT] or kbd:[CTRL].
+On the HC and MC only, the kbd:[PSION] key adds `W_SPECIAL_KEY`.
+
+|W_KEY_ESCAPE (0x1b)
+|Produced by kbd:[ESC], without kbd:[SHIFT] or kbd:[CTRL] on the Work__about__; with or without kbd:[SHIFT] or kbd:[CTRL] on all other machines.
+On the HC and MC only, the kbd:[PSION] key adds `W_SPECIAL_KEY`.
+
+|W_KEY_UP (0x100)
+|Produced by kbd:[UP ARROW], with or without kbd:[SHIFT] or kbd:[CTRL].
+On the HC and MC only, the kbd:[PSION] key adds `W_SPECIAL_KEY`.
+
+|W_KEY_DOWN (0x101)
+|Produced by kbd:[DOWN ARROW], with or without kbd:[SHIFT] or kbd:[CTRL].
+On the HC and MC only, the kbd:[PSION] key adds `W_SPECIAL_KEY`.
+
+|W_KEY_RIGHT (0x102)
+|Produced by kbd:[RIGHT ARROW] on the HC, kbd:[RIGHT ARROW] with or without kbd:[SHIFT] or kbd:[CTRL] on the S3, S3a, Work__about__ and MC.
+On the HC and MC only, the kbd:[PSION] key adds `W_SPECIAL_KEY`.
+
+|W_KEY_LEFT (0x103)
+|Produced by kbd:[LEFT ARROW] on the HC, kbd:[LEFT ARROW] with or without kbd:[SHIFT] or kbd:[CTRL] on the S3, S3a, Work__about__ and MC.
+On the HC and MC only, the kbd:[PSION] key adds `W_SPECIAL_KEY`.
+
+|W_KEY_PAGE_UP (0x104)
+|Produced by kbd:[PSION+UP ARROW] on the S3, S3a and Work__about__, kbd:[PAGE UP] with or without kbd:[SHIFT] or kbd:[CTRL] on the MC.
+On the MC only, the kbd:[PSION] key adds `W_SPECIAL_KEY`.
+
+|W_KEY_PAGE_DOWN (0x105)
+|Produced by kbd:[PSION+DOWN ARROW] on the S3, S3a and Work__about__, kbd:[PAGE DOWN] with or without kbd:[SHIFT] or kbd:[CTRL] on the MC.
+On the MC only, the kbd:[PSION] key adds `W_SPECIAL_KEY`.
+
+|W_KEY_HOME (0x106)
+|Produced by kbd:[PSION+LEFT ARROW] on the S3, S3a and Work__about__, kbd:[HOME] with or without kbd:[SHIFT] or kbd:[CTRL] on the MC.
+On the MC only, the kbd:[PSION] key adds `W_SPECIAL_KEY`.
+
+|W_KEY_END (0x107)
+|Produced by kbd:[PSION+RIGHT ARROW] on the S3, S3a and Work__about__, kbd:[END] with or without kbd:[SHIFT] or kbd:[CTRL] on the MC.
+On the MC only, the kbd:[PSION] key adds `W_SPECIAL_KEY`.
+
+|W_KEY_TASK (0x108)
+|Produced by kbd:[SHIFT+LEFT ARROW (TASK)] on the HC, kbd:[TASK] with or without kbd:[SHIFT] or kbd:[CTRL] on the MC and kbd:[PSION+TAB] on the Work__about__.
+On the MC only, the kbd:[PSION] key adds `W_SPECIAL_KEY`.
+
+Normally processed by the window server to switch the foreground task and not passed to clients.
+However, you can use `wCaptureKey` to capture the `W_KEY_TASK` key (as described under `wCaptureKey`).
+
+|W_KEY_VOICE (0x109)
+|Produced by kbd:[RECORD] with or without kbd:[SHIFT] or kbd:[CTRL] on the MC only.
+The kbd:[PSION] key adds `W_SPECIAL_KEY`.
+
+|W_KEY_CAPS_LOCK (0x10c)
+|Produced by kbd:[CAPS LOCK] on the S3 and MC, by kbd:[PSION+DIAMOND] on the S3a and by kbd:[PSION+SPACE] on the Work__about__.
+
+This key press is processed by the operating system to set the caps lock state and passed to the window server on the S3, S3a and MC (but not on the HC).
+
+On the MC, the window server generates a `WM_KEYBOARD_STATE_CHANGE` event to the shell.
+The window server does not normally pass it on to the foreground client.
+You can use `wCaptureKey` to capture the `W_KEY_CAPS_LOCK` key.
+
+|W_KEY_BACKLIGHT (0x120)
+|Produced by the kbd:[BACKLIGHT] key with or without kbd:[SHIFT] on the HC and the Work__about__.
+On the HC only, the kbd:[PSION] key adds `W_SPECIAL_KEY`.
+
+This key is normally processed by the operating system although you can disable it by calling `p_setbacklight` as described in the _General System Services_ section of the _PLIB Reference_ manual.
+The key is normally passed through to the foreground client (unless captured by a client using `wCaptureKey`).
+
+|W_KEY_INFO (0x121)
+|Produced by `SHIFT+RIGHT ARROW (INFO)` on the HC only.
+
+|W_KEY_MENU (0x122)
+|Produced by kbd:[MENU] with or without kbd:[SHIFT] on the HC and by kbd:[MENU] with or without kbd:[SHIFT], kbd:[CTRL] or kbd:[PSION] on the S3, S3a and Work__about__.
+On the HC only, the kbd:[PSION] key adds `W_SPECIAL_KEY`.
+
+If `wsEnableTemp` has been called, the window server processes kbd:[PSION+MENU] to present a temporary status window (in which case it does not pass the key press on to the client).
+By convention on the S3 and S3a, kbd:[CTRL+MENU] is processed by clients to present a permanent status window.
+
+|W_KEY_HELP (0x123)
+|Produced by kbd:[HELP] with or without kbd:[SHIFT], kbd:[CTRL] or kbd:[PSION] on the S3 and S3a, and by kbd:[ESC] with either kbd:[SHIFT] or kbd:[CTRL], but not kbd:[PSION], on the Work__about__.
+
+As suggested by the S3/S3a key labels, kbd:[PSION+HELP] on these machines should be interpreted as a kbd:[DIAL] key.
+
+|W_KEY_DIAMOND (0x124)
+|Produced by kbd:[DIAMOND] on the S3a only.
+Used by applications to switch from one mode to another.
+
+|W_KEY_APP1 to W_KEY_APP8 (0x131 to 0x138)
+|Produced by the 8 membrane keys on the S3 from left to right (also called application keys).
+
+These are normally handled by the window server in co-operation with the system task.
+For more information, see the section on _Clients and the Window Server_ in the _Introduction_ chapter of this manual.
+
+|W_KEY_MODE (0x130)
+|Produced on the S3 only when the application key that is associated with the foreground application is pressed.
+Applications normally cycle through their display modes in response to this key event.
+
+Produced by kbd:[DIAMOND] on the S3a when running in S3 compatibility mode.
+
+|W_KEY_LCD (0x2000) W_KEY_LCD_MINUS (0x2001)
+|Produced by the kbd:[LCD BRIGHTER] and kbd:[LCD DIMMER] keys on all machines except the Work__about__.
+On the Work__about__ the single kbd:[LCD BRIGHTER] key produces `W_KEY_LCD` only, and kbd:[SHIFT+LCD BRIGHTER] is used to dim the LCD.
+
+These keys are processed by the operating system rather than the window server so you can't use `wCaptureKey` to disable them.
+These keys are normally passed through to the foreground client.
+
+|W_KEY_ON (0x2002)
+|Produced on an HC with version 3.5 of the window server, and on the S3, S3a and Work__about__ when the kbd:[ON] key is pressed.
+
+Also, when the machine switches on for _any_ reason (such as the expiry of an absolute timer) the operating system manufactures an `W_KEY_ON` event to the window serverfootnote:[On the HC, the window server is only informed of the machine being switched on after `p_setonevent(TRUE)` has been called.].
+
+This event is normally processed by the window server to:
+
+[arabic]
+. pass a `WM_ON` event to the foreground client (provided it has called `wInformOn`) or, in version 4 of the window server, pass a `WM_ON` event to a client whether it is in foreground or background (provided it has called `wInformOnAll(TRUE)`)
+. present an info message to inform the user of any low battery statefootnote:[See also the description of the `WSERV_FLAG_LOW_BATTERY_WARNINGS` flag in `wSystem`.]
+. to present the password alert if a password has been set.
+
+When processed by the window server, the `W_KEY_ON` event is not passed to the foreground client.
+
+You can use `wCaptureKey` to capture the kbd:[W_KEY_ON] key. This will disable all window server processing of this event.
+
+|W_KEY_OFF (0x2003)
+|Produced by the OFF key on the HC, S3, S3a and Work__about__ only.
+
+Normally processed by the window server to turn the machine off and not passed to clients.
+However, you can use `wCaptureKey` to capture the OFF key (as described under `wCaptureKey`).
+The capturer can turn the machine off by calling `p_off` -- as described in the _General System Services_ section of the _PLIB Reference_ manual.
+(The same section also describes `p_setauto` which can be used to stop the machine from automatically switching off.)
+You don't get a `W_KEY_OFF` event when the machine automatically switches off.
+|===
+
+==== `WM_REDRAW` Redraw event (WM
+
+Sent when the client's event queue is empty and one or more windows has an update region.
+
+The parameter `event.p.rect` describes a rectangular block of pixels from the update region (and which needs to be redrawn).
+
+The only event type that has a lower priority than `WM_REDRAW` is `WM_USER_MSG`.
+
+==== `WM_BACKGROUND` Background event
+
+Sent to a foreground client when it goes background.
+
+Only `event.type` is set.
+
+On all machines except the MC, you generally do not need to do anything when you receive a `WM_BACKGROUND` event.
+However, if you are doing anything that requires real-time input from the user (a game, for example) or you are doing an animated display, you should suspend the operation until you receive a `WM_FOREGROUND` event.
+
+==== `WM_FOREGROUND` Foreground event
+
+Sent to a background client when it becomes foreground.
+
+Only `event.type` is set.
+
+==== `WM_CANCELLED` Cancellation event
+
+Sent in response to a call to `wCancelGetEvent` command -- see the description of `wCancelGetEvent` in this chapter.
+
+Only `event.type` is set.
+
+==== `WM_USER_MSG` User message event
+
+Sent in response to a call to `wUserMsg`.
+This event has the lowest priority of all and can be used to indicate that the window server has no more messages to send -- see the description of `wUserMsg` in this chapter.
+
+Only `event.type` is set.
+
+==== `WM_ON` Machine switched on event
+
+Available in version 3.5 of the window server; if the client has called `wInformOn`, it is sent this event when the machine is switched on and it is in foreground.
+
+The event is designed to prompt the foreground client to update its display.
+
+On the HC, the window server is only informed of the machine being switched on after `p_setonevent(TRUE)` has been called.
+
+In version 4 of the window server, if the client has called `wInformOnAll(TRUE)`, it is sent this event when the machine is switched on, whether it is in foreground or background.
+
+Only `event.type` is set.
+
+==== `WM_COMMAND` Command received from another client
+
+This is sent in response to a `wSendCommand` from another client to prompt the receiver of the event to call `wGetCommand` to get the command data.
+It is only available in version 3.5 of the window server.
+
+Only `event.type` is set.
+
+==== `WM_TASK_UPDATE` Inform shell of process termination
+
+Sent to the shell if it is foreground and any process terminates (not just clients of the window server).
+
+Available only on the S3, S3a and Work__about__, and on an HC running version 3.5 upwards of the window server.
+Disabled by default on the HC -- see the description of `wSystem`.
+
+Only `event.type` is set.
+
+==== `WM_TASK_KEY` Inform application key handler
+
+Sent to the application key handler when:
+
+* an application key is pressed and no process of that application exists
+* a kbd:[PSION] shifted application key is pressed
+
+Applies only to the S3, S3a and Work__about__.
+
+The index of the application key in the range 0 to 15 is written to `event.p.key.keycode`.
+The window server handles 16 application keys, where a second set of 8 keys are accessed by holding down the kbd:[CONTROL] key.
+
+==== `WM_DATE_CHANGED` Change of date event
+
+Introduced in version 4 of the window server.
+Sent whenever the date changes, either because the date has en reset or the clock has gone past midnight.
+
+The message is sent to any Series 3a or Work__about__ application which is not in Series 3 compatibility mode and is in foreground at the time of the event
+
+Non compatibility mode applications which are in background will receive the message the next time they come into foreground.
+
+If the machine is off at the time of the event, the message is delivered when the machine is next turned on.
+
+==== `WM_ESCAPE` Escape-key event
+
+In version 4 of the window server, this message is delivered to an application when the ESC key is pressed in the following circumstances:
+
+* The application must have asynchronously requested selected events by calling `wGetEventSpecial`.
+* Among the events selected for delivery, `WE_EVENT_ESC` must be _included_ but `WE_EVENT_KEY` must be _excluded_.
+
+In this situation, the content of the keyboard buffer is discarded.
+
+=== Large screen events
+
+The event types in this section are only generated on large screen versions of the window server, such as on the MC200 and MC400 machines.
+
+==== `WM_DEICONISE` Deiconisation event
+
+Sent to a client to tell it to deiconise.
+The client will have previously declared itself iconised with a `wClientIconised` call.
+
+Only `event.type` is set.
+
+A client receives this message when another client calls `wClientPosition` to position it to the foreground.
+
+It is also sent to the system application (`sys$shll.img`) when it is iconised and selected by the kbd:[PSION+TASK] key press.
+
+==== `WM_ATTACHED` Attachment event
+
+Sent to a client to tell it another client has attached itself on top of it. The `uword` field of the `WS_EVENT_UNION` structure is set to the process ID of attached client.
+After receiving this message the client will not be able to receive `WM_KEY` events until the attached client detaches, terminates or disconnects from the window server.
+
+Only `event.type` is set.
+
+A client will receive a `WM_ATTACHED` event when the notifier process (sys$ntfy) attaches itself to the foreground client when any process calls `p_notify` or `p_notifyerr`.
+
+==== `WM_DETACHED` Detachment event
+
+Sent to a client when a previously attached client detaches (either by a `wDetachClient` call, by terminating or by disconnecting from the window server).
+
+Only `event.type` is set.
+
+==== `WM_KEYBOARD_STATE_CHANGE` Keyboard state change event
+
+This event is only ever sent to the system application (`sys$shll.img`).
+It is sent when either the numlock or capslock state changes.
+The new states of these can be read from `event.p.caps.modifiers`. 
+
+=== Mouse events
+
+The event types in this section are only generated on machines with a pointing device, such as on the MC200 and MC400.
+
+==== `WM_MOUSE` Mouse event
+
+Sent when ever there is a change of state on the mouse (digitiser).
+
+The `WMSG_MOUSE` structure is defined as:
+
+[source,c]
+----
+typedef struct
+{
+    UBYTE event; /* type of mouse event */
+    UBYTE state; /* state of mouse button, shift keys etc */
+    P_POINT pos; /* mouse position (relative to window) */
+} WMSG_MOUSE;
+----
+
+`event.p.mouse.event` gives the type of the mouse event that occurred and is one of:
+
+[cols="1m,3"]
+|===
+|WM_MOUSE_MOVE
+|mouse movement event (this is filtered out by default)
+
+|WM_MOUSE_PRESS
+|mouse press event
+
+|WM_MOUSE_RELEASE
+|mouse release event
+|===
+
+Mouse movement events (`WM_MOUSE_MOVE`) are filtered out unless explicitly enabled, on a per-window basis.
+See `wCreateWindow` and `wSetWindow` for details.
+
+`event.p.mouse.state` gives the state of the mouse and the key modifiers when the event occurred, it may be tested using the bit masks:
+
+[cols="1m,3"]
+|===
+|W_MOUSE_DOWN
+|mouse button down
+
+|W_MOUSE_OUTSIDE
+|mouse event occurred outside window
+
+|W_SHIFT_MODIFIER
+|kbd:[SHIFT] key down
+
+|W_CTRL_MODIFIER
+|kbd:[CTRL] key down
+
+|W_PSION_MODIFIER
+|kbd:[PSION] key down
+
+|W_CAPS_MODIFIER
+|Caps lock on
+
+|W_NUM_LOCK_MODIFIER
+|Num lock on
+|===
+
+The `W_MOUSE_OUTSIDE` bit is set when a mouse event occurs outside the visible portion of the given window.
+This can happen when either:
+
+* a window has grabbed the mouse, by specifying the `W_WIN_MOUSE_GRAB` bit, `WM_MOUSE_RELEASE` events are sent to the same window that received the `WM_MOUSE_PRESS` event, even if the mouse has subsequently moved outside the visible portion of the window.
+
+or:
+
+* a window has captured the mouse by calling `wCaptureMouse`.
+
+Testing the `W_MOUSE_OUTSIDE` bit is not equivalent to checking the mouse position against the extent of the window, because a client can never know if part of the window has been obscured.
+
+==== `WM_RUBBER_BAND_INIT` Start rubber band
+
+This is a special version of the `WM_MOUSE` message, it also uses the WMSG_MOUSE structure.
+It is sent instead of a `WM_MOUSE` event when a mouse press occurs inside a window with the `W_WIN_RUBBER_BAND_CAPTURE` flag set.
+
+See the _Rubber Band_ section for details.
+
+==== `WM_RUBBER` Complete rubber band
+
+Sent on completion of a rubber band.
+
+See the _Rubber Band_ section for details.
+
+==== `WM_ACTIVE` Activation event
+
+Sent to a window that has previously set the `W_WIN_INACTIVE` bit (in a call to `wCreateWindow` or `wSetWindow`) whenever a `WM_MOUSE` event of type `WM_MOUSE_PRESS` is sent to the window or any of its descendants.
+
+Only `event.type` is set.
+
+`WM_ACTIVE` notifies a parent that the mouse has clicked somewhere in its window tree. The `WM_MOUSE` event is then sent straight to the window where the click occurred (unless that window has the `W_WIN_NO_MOUSE` bit set).
+
+If a window and its descendant both have the `W_WIN_INACTIVE` bit set, they both receive a `WM_ACTIVE` event if there is a click in a descendant of the descendant window.
+
+=== Event functions
+
+==== `wCancelGetEvent` Request a cancel event
+
+[source,c]
+----
+VOID wCancelGetEvent(VOID);
+----
+
+Instruct the window server to send the caller a `WM_CANCELLED` event.
+
+After a call to `wCancelGetEvent`, the window server delivers the `WM_CANCELLED` event at the highest priority -- any other events waiting in the window server client event queue are overtaken.
+
+==== `wUserMsg` Request a user event
+
+[source,c]
+----
+VOID wUserMsg(VOID);
+----
+
+Instruct the window server to send the client a `WM_USER_MSG` as soon as it has no other event to report.
+
+A second call to this function before the first `WM_USER_MSG` is delivered will have no effect.
+
+==== `wSendCommand` Send a command to another client
+
+[source,c]
+----
+INT wSendCommand(HANDLE pid, VOID *pbuf, UINT len);
+----
+
+Send the `len` bytes of data at `pbuf` to the window server client with process ID `pid`.
+
+If the call is successful, the function returns zero and client pid will receive a `WM_COMMAND` event to which it should respond by calling `wGetCommand` (as described below).
+
+If no client with process ID `pid` exists, the function leaves or returns with the error number `E_FILE_NXIST`.
+
+The function can be used to send up to 127 bytes.
+If `len` is 1 or 2, the function does not allocate any memory.
+If `len` is greater than 2, the function could leave or return with the error number `E_GEN_NOMEMORY`.
+
+Only available in version 3.5 and upwards of the window server.
+
+==== `wGetCommand` Get a command from another client
+
+[source,c]
+----
+INT wGetCommand(VOID *pbuf);
+----
+
+Write to `pbuf`, the command data that was last sent to this process (with a call to `wSendCommand`).
+
+This function should be called in response to the receipt of a `WM_COMMAND` event.
+
+There should be at least 127 bytes of memory at `pbuf`.
+
+If another command is sent to the client before it has read the old command, the old command is overwritten with the new data.
+
+The function behaves as for `wCheckPoint` in that it flushes the client-side buffer and reports any uncleared error -- either by calling `p_leave` or by returning the error number.
+
+Only available in version 3.5 and upwards of the window server.
+
+==== `wInformOn` Enable the reception of `WM_ON` events
+
+[source,c]
+----
+VOID wInformOn(VOID);
+----
+
+Enable the reception of a `WM_ON` event when the machine is switched on.
+
+The window server only sends a `WM_ON` event to the foreground client.
+
+On the HC, the window server is only informed of the machine being switched on after `p_setonevent(TRUE)` has been called (normally by the shell).
+
+Only available in version 3.5 and upwards of the window server.
+
+==== `wInformOnAll` Enable/disable the reception of `WM_ON` events
+
+[source,c]
+----
+VOID wInformOnAll(UINT state);
+----
+
+Available in version 4 of the window server, this function is similar to `wInformOn`. However, there are some subtle differences.
+
+If state is `TRUE`, it enables the reception of `WM_ON` events; on the other hand, if state is FALSE, it disables the reception of `WM_ON` events.
+
+When enabled by this call, `WM_ON` events are delivered whenever the machine is switched on, regardless of whether the calling client is in foreground or in background.
+
+Disabling `WM_ON` events with this call disables the reception of `WM_ON` events regardless of whether they were originally enabled by a call to `wInformOnAll` or `wInformOn`.
+
+=== Capturing keys
+
+==== `wCaptureKey` Capture a key
+
+[source,c]
+----
+INT wCaptureKey(UINT keycode, UINT modifiers, UINT modifier_mask);
+----
+
+Send the specified key press(es) to the calling client, whether it is foreground or not.
+
+Every time a key is pressed the window server evaluates
+
+[source,c]
+----
+(key_pressed_code==keycode) && ((key_pressed_modifiers&modifier_mask)==modifiers)
+----
+
+and if the result is `TRUE` then the keyboard event is sent to the client that specified the capture.
+
+For example:
+
+[source,c]
+----
+wCaptureKey(W_SPECIAL_KEY|'a',W_PSION_MODIFIER,W_PSION_MODIFIER);
+----
+
+captures kbd:[PSION+A], kbd:[PSION+SHIFT+A], kbd:[PSION+SHIFT+CTRL+A], and kbd:[PSION+CTRL+A].
+Whereas:
+
+[source,c]
+----
+wCaptureKey(W_SPECIAL_KEY|'a',W_PSION_MODIFIER,W_PSION_MODIFIER|W_SHIFT_MODIFIER);
+----
+
+captures kbd:[PSION+A] and kbd:[PSION+CTRL+A].
+
+Note from the above that it is possible for two different but similar key/modifier combinations to capture the same key presses.
+This is significant if the two calls to `wCaptureKey` came from different clients.
+Where two key capture records select the same key press, the key event is delivered to the first client to call `wCaptureKey`.
+
+The function is useful for implementing "hotkeys" which select a particular task.
+However, you should only capture relatively obscure key combinations which are not normally used by the tasks themselves (capturing the unmodified A key, for example, would be disastrous).
+
+The function returns zero if successful.
+Errors include `E_GEN_NOMEMORY` and, if there is already a capture record with a matching keycode, modifiers and modifier_mask (even as a result of a `wCaptureKey` from another client), `E_FILE_EXIST`.
+The function either leaves or returns the error, depending on whether `wDisableLeaves` has been called.
+
+The window server automatically cancels any calls a client has made to `wCaptureKey` when that client disconnects or terminates.
+
+On an HC, an application can disable the window server's processing of the kbd:[TASK] key by capturing it with:
+
+[source,c]
+----
+wCaptureKey(W_KEY_TASK,0,0);
+----
+
+Not available in version 2 of the window server.
+
+==== `wCancelCaptureKey` Cancel key capture
+
+[source,c]
+----
+INT wCancelCaptureKey(UINT keycode, UINT modifiers, UINT modifier_mask);
+----
+
+Cancel a key capture set up by `wCaptureKey`, the keycode and masks must exactly match those used to initiate the capture.
+
+The function returns zero if successful. If the keycode/modifier combination is not marked as captured then the function will leave or return `E_FILE_NXIST`.
+
+Not available in version 2 of the window server.
+
+=== Setting task switch keys
+
+==== `wSetTaskKey` Set a task switch key
+
+[source,c]
+----
+INT wSetTaskKey(UINT keycode, UINT modifiers, UINT modifier_mask);
+----
+
+Set the specified keypress(es) to move the foreground client to the end of the task list and bring the client previously at position 1 (where the foreground process has position zero) to the foreground.
+
+As for captured keys, every time a key is pressed the window server evaluates
+
+[source,c]
+----
+(key_pressed_code==keycode) && ((key_pressed_modifiers&modifier_mask)==modifiers)
+----
+
+and if the result is `TRUE`, the tasks are cycled.
+
+The effect of setting the task key does not cease when the calling client disconnects or terminates.
+The only way to stop the key press from being a task key is to call `wCancelTaskKey`.
+
+Any number of task switch keys may be set. On the HC and MC, these operate in addition to the `W_KEY_TASK` key (unless the `W_KEY_TASK` key has been captured).
+
+The function returns zero if successful.
+If there is already a set task key record with a matching keycode, modifiers and modifier_mask, the function leaves or returns `E_FILE_EXIST`.
+It can also fail with `E_GEN_NOMEMORY`.
+If there is already a _capture_ record with a matching keycode, modifiers and modifier_mask, the capture key record is cancelled and replaced by the task key record.
+
+The shell on the S3 and S3a calls `wSetTaskKey` to assign kbd:[SHIFT+SYSTEM] as a task key.
+
+Only available in version 3.5 upwards of the window server.
+
+==== `wCancelTaskKey` Cancel a task switch key
+
+[source,c]
+----
+INT wCancelTaskKey(UINT keycode, UINT modifiers, UINT modifier_mask); Cancel a task key setting, set up with `wSetTaskKey`.
+----
+
+The function returns zero if successful. If the keycode/modifier combination is not marked as a task key then the function will leave or return `E_FILE_NXIST`.
+
+=== `wSetBackTaskKey` Set a back task switch key
+
+[source,c]
+----
+INT wSetBackTaskKey(UINT keycode, UINT modifiers, UINT modifier_mask);
+----
+
+Set the specified keypress(es) to bring the client furthest from the front to the foreground.
+
+Except that it cycles tasks in the opposite direction, `wSetBackTaskKey` is identical to `wSetTaskKey`.
+
+The shell on the S3 and S3a calls `wSetBackTaskKey` to assign kbd:[SHIFT+PSION+SYSTEM] to the "back-task" key which brings the task furthest from the front to the foreground.
+
+==== `wCancelBackTaskKey` Cancel a back task switch key
+
+[source,c]
+----
+INT wCancelBackTaskKey(UINT keycode, UINT modifiers, UINT modifier_mask); Cancel a back task key setting, set up with `wSetBackTaskKey`.
+----
+
+The function returns zero if successful. If the keycode/modifier combination is not marked as a back task key then the function will leave or return `E_FILE_NXIST`.
+
+=== Capturing the mouse
+
+==== `wCaptureMouse` Capture the mouse
+
+[source,c]
+----
+VOID wCaptureMouse(UINT wid);
+----
+
+Capture the mouse within window `wid` and all its descendants. This function does not capture with respect to other clients' windows.
+
+It is used, for example, by the dialog box that allows the user to click on it or any of its constituent windows, but ignores clicks to other windows in the application (ie the menu bar and the application's client window).
+
+If mouse capture is already active in another window then the previous capture will be cancelled before the new capture is activated.
+
+If a window with capture is destroyed the mouse is automatically released.
+
+==== `wReleaseMouse` Release the mouse
+
+[source,c]
+----
+VOID wReleaseMouse(VOID);
+----
+
+Cancel the mouse capture, does nothing if there was no capture active.
+
+=== The rubber band
+
+The rubber band is only implemented on machines with a pointing device, such as on the MC200 and MC400.
+
+==== `wRubberBand` Rubber banding
+
+[source,c]
+----
+VOID wRubberBand(UINT msg_window, UINT band_window, `W_RUBBER_BAND` *prubber);
+----
+
+Start the rubber band and return immediately where the result is returned later as a `WM_RUBBER` event (which might just indicate that the parameters are illegal).
+`msg_window` is the ID of the window to which the `WM_RUBBER` event will be sent.
+
+`band_window` is the ID of the window in which the rubber band will be drawn, it is usually set to zero (the whole screen).
+
+The rubber band is displayed as specified by the `W_RUBBER_BAND` struct at address prubber where `W_RUBBER_BAND` is defined as:
+
+[source,c]
+----
+typedef struct
+{
+    P_EXTENT start; /* initial size and position */
+    P_EXTENT outer; /* outer bounding rectangle */
+    P_EXTENT inner; /* inner bounding rectangle */
+    UWORD flags;
+    UWORD minx; /* max and min size limits */
+    UWORD miny;
+    UWORD maxx;
+    UWORD maxy;
+    P_POINT grid_snap; /* x and y grid snap values */
+} W_RUBBER_BAND;
+----
+
+If flags is set to zero then the following default values will be used:
+
+[cols="1m,3"]
+|===
+|resizing
+|Disabled.
+
+|minx
+miny
+maxx
+maxy
+|Not applicable when resizing disabled.
+
+|start
+|The extent of msg_window. outer No outer bounds.
+
+|inner
+|The visible extent of band_window.
+
+|grid_snap|
+(1,1) in the x and y directions.
+
+|complete on release
+|Disabled.
+|===
+
+Each of these defaults may be overridden by setting the following bits in flags:
+
+[cols="1m,3"]
+|===
+
+|W_BAND_RESIZE
+|enables resizing of the rubber band, if this is selected the rubber band will appear on screen with its resize triangles, if resizing is disabled the rubber band appears as a rectangle.
+When resizing is enabled then minx, miny, maxx and maxy (which determine the maximum and minimum sizes of the rubber band) must be set.
+
+|W_BAND_START
+|sets the start position and size to start.
+If this conflicts with inner, outer or the maximum or minimum size limits then it will be modified appropriately.
+
+|W_BAND_INNER
+|sets the inner rectangle to inner.
+The movement of the rubber band is restricted such that part of the rubber band stays within this rectangle.
+
+|W_BAND_OUTER
+|sets the outer rectangle to outer.
+The movement of the rubber band is restricted such that no part of the rubber band extends outside this rectangle.
+
+|W_BAND_GRID_SNAP
+|sets the grid snap values to `grid_snap`.
+The rubber band will move/resize in steps of `grid_snap`.
+
+|W_BAND_GRID_SNAP_SIZE
+|as for `W_BAND_GRID_SNAP` except that only the size of the rubber band (and not its position) is grid snapped.
+
+|W_BAND_COMPLETE_ON_UP
+|causes the rubber band to complete on the first mouse up event.
+|===
+
+The values in `start`, `outer` and `inner` are all relative to `band_window`.
+
+If there is no legal position for the rubber band then the rubber band completes immediately with a `WM_RUBBER` message with the state set to `WM_BAND_ERROR`.
+This could happen (say) if minx is greater than maxx or if inner does not intersect with outer.
+
+===== `WM_RUBBER` events
+
+The window server sends a `WM_RUBBER` message when the rubber banding completes.
+The format of the `WM_RUBBER` message is:
+
+[source,c]
+----
+typedef struct
+{
+    UWORD state; /* completion state */
+    P_EXTENT extent; /* the selected extent */
+} WMSG_RUBBER;
+----
+
+`state` is set to one of the following:
+
+[cols="1m,3"]
+|===
+|WM_BAND_NOMOVE
+|the band position was selected without any moving or resizing, extent is the same as set in `wRubberBand`.
+
+|WM_BAND_MOVE
+|the rubber band moved but did not change size.
+`extent` is set to the new position and the old height and width.
+
+|WM_BAND_RESIZE
+|the rubber band has been resized (and perhaps also moved).
+`extent` contains the new position and size.
+
+|WM_BAND_CANCEL
+|the rubber band was cancelled.
+`extent` is undefined.
+
+|WM_BAND_ERROR
+|the rubber band was not displayed because of illegal parameters in `wRubberBand`.
+|===
+
+===== Capturing mouse and keyboard events
+
+The flag `W_WIN_RUBBER_BAND_CAPTURE` used in the `wSetWindow` and `wCreateWindow` commands can be used to capture all mouse and keyboard events to the rubber band from the moment the mouse was pressed in the specified window.
+The first click in the window will be sent to the window as a `WM_RUBBER_BAND_INIT` event and held in a buffer as a `WM_MOUSE` event (of type `WM_MOUSE_PRESS`).
+Subsequent mouse and keyboard events will also be buffered.
+When the rubber band becomes active it will receive all the buffered events.
+The capture is cancelled on completion of the rubber band.
+
+When a client receives a `WM_RUBBER_BAND_INIT` event it MUST call `wRubberBand` immediately.
+This is because all clients will have all their mouse events and keys blocked.
+If the client decides that it does not want to launch a rubber band then it should set the `W_BAND_KILL_CAPTURE` flag in flags and call `wRubberBand`, this will cancel the mouse capture without actually launching a rubber band (all parameters in the `W_RUBBER_BAND` structure are ignored except that `msg_window` must be a valid window ID).
+
