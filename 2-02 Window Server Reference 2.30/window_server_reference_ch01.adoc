@@ -11,7 +11,7 @@ This manual completely supersedes previous versions and takes account of:
 
 The window server is a system process (with process name `SYS$WSRV`) that runs under the EPOC operating system to provide "client" processes with shared access to the screen, keyboard and (if there is one) a pointing device.
 
-image:media/image1-new.png[]
+image:media/image1.png[]
 
 A server process is required because EPOC is a _single-user_ multi-tasking operating system as opposed to a multi-user system.
 On a single-user system, all the application processes must share the same screen and keyboard.
